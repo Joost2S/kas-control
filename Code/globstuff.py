@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.8.3	16-08-2017
+# v0.8.14	07-01-2018
 
 
 from abc import ABCMeta, abstractmethod
@@ -15,118 +15,12 @@ import sys
 import threading
 import time
 
-import dbstuff
-import ds18b20
 import mcp23017
-import mcp3x08
-import webgraph
-
-
-class Group(object):
-	"""This object represents the combination of a soil sensor and watervalve."""
-
-	# chan
-	@property
-	def chan(self):
-		return(self.__chan)
-	@chan.setter
-	def chan(self, chan):
-		self.__chan = chan
-	#devchan
-	@property
-	def devchan(self):
-		return(self.__devchan)
-	@devchan.setter
-	def devchan(self, devchan):
-		self.__devchan = devchan
-	# spichan
-	@property
-	def spichan(self):
-		return(self.__spichan)
-	@spichan.setter
-	def spichan(self, spichan):
-		self.__spichan = spichan	
-	# name
-	@property
-	def name(self):
-		return(self.__name)
-	@name.setter
-	def name(self, name):
-		self.__name = name
-	# connected
-	@property
-	def connected(self):
-		return(self.__connected)
-	@connected.setter
-	def connected(self, connected):
-		self.__connected = connected
-	# watering
-	@property
-	def watering(self):
-		return(self.__watering)
-	@watering.setter
-	def watering(self, watering):
-		self.__watering = watering
-	#below_range	
-	@property
-	def below_range(self):
-		return(self.__below_range)
-	@below_range.setter
-	def below_range(self, below_range):
-		self.__below_range = below_range
-	# lowtrig
-	@property
-	def lowtrig(self):
-		return(self.__lowtrig)
-	@lowtrig.setter
-	def lowtrig(self, lowtrig):
-		self.__lowtrig = lowtrig
-	# hightrig
-	@property
-	def hightrig(self):
-		return(self.__hightrig)
-	@hightrig.setter
-	def hightrig(self, hightrig):
-		self.__hightrig = hightrig
-	# ff1
-	@property
-	def ff1(self):
-		return(self.__ff1)
-	@ff1.setter
-	def ff1(self, ff1):
-		self.__ff1 = ff1
-	# ff2
-	@property
-	def ff2(self):
-		return(self.__ff2)
-	@ff2.setter
-	def ff2(self, ff2):
-		self.__ff2 = ff2
-		
-	def __init__(self, i, v, lowtrig, hightrig, ff1, ff2):
-		self.chan = i
-		if (i <= 7):
-			self.devchan = i
-			self.spichan = 0
-		elif (i <= 14):
-			self.devchan = (i - 7)
-			self.spichan = 1
-		else:
-			logging.waring("Too many group channels defined. Group: " + i)
-		self.name = "Soil" + str(i + 1)
-		self.valve = v
-
-		self.connected = False			# A sensor is considered disconnected when value <= 150
-		self.watering = False
-		self.below_range = 0
-		self.lowtrig = lowtrig
-		self.hightrig = hightrig
-		self.ff1 = ff1
-		self.ff2 = ff2
 
 		
 class sigLED(object):
-	"""This object is for controlling the signalling LED on the box."""
+	"""This object is for controlling the status LED."""
+
 	# GPIO pin
 	@property
 	def pin(self):
@@ -134,18 +28,28 @@ class sigLED(object):
 	@pin.setter
 	def pin(self, pin):
 		self.__pin = pin
-
+	# interval
 	@property
 	def interval(self):
 		return(self.__interval)
 	@interval.setter
 	def interval(self, interval):
 		self.__interval = interval
-		
+	# enabled
+	@property
+	def enabled(self):
+		return(self.__enabled)
+	@enabled.setter
+	def enabled(self, enabled):
+		self.__enabled = enabled
+
 	def __init__(self, pin):
 		self.pin = pin
 		self.interval = 0.5
-		
+		self.enabled = True
+		GPIO.setup(pin, GPIO.OUT)
+		GPIO.output(pin, GPIO.LOW)
+
 	def blinkSlow(self, i):
 		for j in range(0, i):
 			self.on()
@@ -160,8 +64,13 @@ class sigLED(object):
 			self.off()
 			time.sleep(self.interval / 2)
 
+	def disable(self):
+		self.enabled = False
+		self.off()
+
 	def on(self):
-		GPIO.output(self.pin, GPIO.HIGH)
+		if (self.enabled):
+			GPIO.output(self.pin, GPIO.HIGH)
 
 	def off(self):
 		GPIO.output(self.pin, GPIO.LOW)
@@ -199,49 +108,30 @@ class floatUp(object):
 	def pump(self, pump):
 		self.__pump = pump
 
-	def __init__(self, float_switch, pump, sLED):
+	def __init__(self, float_switch, pump, sLED = None):
 		self.low_water = False
 		self.float_switch = float_switch
 		self.sLED = sLED
 		self.pump = pump
 		self.lastMailSent = 0
+		GPIO.setup(self.float_switch, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+		GPIO.add_event_detect(self.float_switch, GPIO.RISING, callback=(self.lwstart), bouncetime=1000)
+		if (self.getStatus()):
+			self.lwstart()
 		
-	def check_level(self):
-		"""\t\tRun as seperate thread when a low water level situation occurs.
-		Will self terminate when the water level is high enough again."""
-
-		while(self.low_water):
-			input_state = self.getStatus()
-			print(input_state)
-			self.sLED.blinkFast(5)
-			if (not input_state and not globstuff.running):
-				self.low_water = False
 
 	def getStatus(self):
 		"""\t\tChecks and returns the current status of the float switch.
 		True if low water, False if enough water."""
 
 		return(GPIO.input(self.float_switch))
-
-	def lwstrt(self):
-		"""Run at startup to check initial water level."""
-
-		if (self.getStatus):
-			self.low_water = True
-			print("Low water status: " + str(self.low_water))
-			self.pump.disable()
-
-			#	Start level checking and alarm LED.
-			blink = lowWater(globstuff.getThreadNr(), "water level check")
-			blink.start()
-			globstuff.draadjes.append(blink)
-
-	def lwstart(self, startup):
+	
+	def lwstart(self, mail = False):
 		"""If low water level is detected, run this to disable pumping and send an email to user."""
 
 		if (GPIO.input(self.float_switch)):
 			self.low_water = True
-			print("Low water status: " + str(self.low_water))
+			logging.info("Low water status: " + str(self.low_water))
 			self.pump.disable()
 
 			#	Start level checking and alarm LED.
@@ -249,28 +139,39 @@ class floatUp(object):
 			blink.start()
 			globstuff.draadjes.append(blink)
 
-			# prevent sending mails too often.
-			if (not (time.time() - self.lastMailSent) < 10800):
-				#	Send an email to alert user.
-				self.lastMailSent = time.time()
-				fromaddr = ""
-				toaddr  = ""
-				subject = "Laag water"
-				text = "Er is te weinig water in de regenton. Automatische bewatering is gestopt tot de regenton verder is gevuld"
-				date = datetime.datetime.now().strftime( "%d/%m/%Y %H:%M" )
-				msg = ("From: %s\nTo: %s\nSubject: %s\nDate: %s\n\n%s" % ( fromaddr, toaddr, subject, date, text ))
+			if (mail):
+				# prevent sending mails too often.
+				if (not (time.time() - self.lastMailSent) < 10800):
+					#	Send an email to alert user.
+					self.lastMailSent = time.time()
+					fromaddr = "kas.mam.control@gmail.com"
+					toaddr  = "tinakoster@hotmail.com"
+					subject = "Laag water"
+					text = "Er is te weinig water in de regenton. Automatische bewatering is gestopt tot de regenton verder is gevuld"
+					date = datetime.datetime.now().strftime( "%d/%m/%Y %H:%M" )
+					msg = ("From: %s\nTo: %s\nSubject: %s\nDate: %s\n\n%s" % ( fromaddr, toaddr, subject, date, text ))
 
-				# Credentials
-				username = fromaddr
-				password = ""
+					# Credentials
+					username = fromaddr
+					password = "halloblaatdingesblahmoi"
 
-				# The actual mail send
-				server = smtplib.SMTP("smtp.gmail.com:587")
-				server.starttls()
-				server.login(username,password)
-				server.sendmail(fromaddr, toaddr, msg)
-				server.quit()
-				logging.debug("Sent mail to " + toaddr)
+					# The actual mail send
+					server = smtplib.SMTP("smtp.gmail.com:587")
+					server.starttls()
+					server.login(username,password)
+					server.sendmail(fromaddr, toaddr, msg)
+					server.quit()
+					logging.debug("Sent mail to " + toaddr)
+					
+	def check_level(self):
+		"""\t\tRun as seperate thread when a low water level situation occurs.
+		Will self terminate when the water level is high enough again."""
+
+		while(self.low_water):
+			input_state = self.getStatus()
+			self.sLED.blinkFast(5)
+			if (not input_state and not globstuff.running):
+				self.low_water = False
 
 
 class protoThread(threading.Thread):
@@ -314,9 +215,9 @@ class protoThread(threading.Thread):
 class lowWater(protoThread):
 
 	def run(self):
-		print("Starting thread{0}: {1}".format(self.threadID, self.name))
+		logging.info("Starting thread{0}: {1}".format(self.threadID, self.name))
 		globstuff.fltdev.check_level()
-		print("Exiting thread{0}: {1}".format(self.threadID, self.name))
+		logging.info("Exiting thread{0}: {1}".format(self.threadID, self.name))
 		
 
 class Pump(object):
@@ -495,68 +396,94 @@ class Pump(object):
 		return(True)
 
 
+class valve(object):
+
+	power = 250		# mA
+	__enabled = False
+	open = False
+	mcp = None
+	pin = ""
+
+	def __init__(self, pin):
+		
+		if (globstuff.getPinDev(pin).setPin(globstuff.getPinNr(pin))):
+			self.mcp = globstuff.getPinDev(pin)
+			self.pin = globstuff.getPinNr(pin)
+			self.__enabled = True
+
+	def on(self):
+
+		if (self.__enabled):
+			self.open = True
+			globstuff.get
+	def off(self):
+
+		if (self.__enabled):
+			self.open = False
+	
+
 class globstuff:
 
-	# Lists for pin numbers and other I/O
-	ch_list = []
-	dataloc = os.path.dirname(os.path.realpath(__file__)) + "/datafiles/"
-	valvelist = dataloc + "valves.csv"
-	wateringlist = dataloc + "waterlist.csv"
+	hwOptions = {"lcd" : True,
+				  "buttons" : True,
+				  "ledbars" : True,
+				  "flowsensors" : True,
+				  "floatswitch" : True,
+				  "soiltemp" : True,
+				  "powermonitor" : True,
+				  "status LED" : True,
+				  "fan" : True,
+				  }
+
+	# Locations of files.
+	dataloc = str(os.path.dirname(os.path.realpath(__file__))) + "/datafiles/"
+	sensSetup = dataloc + "sensorSetup.csv"
 	logfile = dataloc + "kascontrol.log"
-	lightname = "light"							# Name of the channel of the lightsensor.
-	tempname = "kastemp"
-	waterlength = 100								# Amount of entries in the watering list.
-	currentstats = ""								# Copy of sensor output updated eachtime_res seconds.
-														# For fast disply of data to user.
-	# Other GPIO pin assignments:
-	pumpPin = "1A0"
-	sLEDpin = 23
-	float_switch = 22
+
+	# Misc GPIO pin assignments:
+	button0pin = "2B0"				# Input pin for button 0.
+	button1pin = "2B1"				# Input pin for button 1.
+	pumpPin = "1A0"					# Pin for the pump.
+	sLEDpin = 23						# Status LED pin.
+	float_switch = 22					# Float switch pin, goes high if there is too little water in the storage tank.
+	intPinU4 = 5						# Interrupt pin for mcp23017 0x20, U4
+	intPinU5 = 25						# Interrupt pin for mcp23017 0x23, U5
 			
+	# LCD pins:
+	LCD4 = 26
+	LCD5 = 16
+	LCD6 = 21
+	LCD7 = 20
+	LCD_E = 19
+	LCD_RS = 13
+	LCD_L = 12
+
 	# Networking vars:
-	host = ""
-	port = 7500
-	socket = None
+	host = ""							# Hostname.
+	port = 7500							# Default network port. If already used, can go up to port 7504
 	
 	# Misc vars
 	draadjes = []						# List with all the active threads.
 	wtrThreads = []					# List with all watering threads.
 	threadnr = 0						# Keep track of the thread number.
-	shutdownOpt = None				# Set shutdown mode.
 	testmode = False					# Disables certain features for diagnositc purposes.
 	time.sleep(0.5)					# Make sure some time has passed so the system clock is updated after boot.
 	boottime = time.time()			# Record boot time to display system uptime.
 	running = True						# Set to False to enable shutdown
-	time_res = 5.0						# sets the time resolution for recording to the database (in min)
-											# and polling (in sec) of all the data.
+	shutdownOpt = None				# Set shutdown mode.
 
-	# Populating ch_list with groups of (sensor + valve)
-	with open(valvelist, "r", newline = "") as filestream:
-		file = csv.reader(filestream, delimiter = ",")
-		for i, line in enumerate(file):
-			if (i == 0):
-				continue
-			ch_list.append(Group(i-1, str(line[0]), int(line[1]), int(line[2]), str(line[3]), str(line[4])))
+	# Initiate MCP23017 GPIO expanders:
+	mcplist = (mcp23017.mcp23017(0x21),				# u2
+				mcp23017.mcp23017(0x20, intPintU4),	# u4
+				mcp23017.mcp23017(0x23, intPinU5),	# u5
+				mcp23017.mcp23017(0x27)					# u6
+				)
 
-	dbSetup = [(tempname, "temp"),
-					(lightname, "light")]
-	for g in ch_list:
-		dbSetup.append((g.name, "mst"))
-			
-	# Initiate various devices:
-	tDevList = []
-	for d in ds18b20.getTdev():
-		name = None
-		if (d == "/sys/bus/w1/devices/28-000007c0d519/w1_slave"):
-			name = tempname
-		tDevList.append(ds18b20.ds18b20(d, name))
-	sLED = sigLED(sLEDpin)
-	pump = Pump(pumpPin, sLED)
-	fltdev = floatUp(float_switch, pump, sLED)
-	mcplist = [mcp23017.mcp23017(0x21), mcp23017.mcp23017(0x20)]	# u2, u4
-	adc = mcp3x08.mcp3208(0, mcplist[0])		# u1
-	db = dbstuff.db(dbSetup, time_res, dataloc, adc, tDevList, mma = True, period = "Y")
-	wgraph = webgraph.webgraph(db)
+	# Major modules:
+	control = None						# Reference to the hwcontrol instance.
+	db = None							# Reference to database instance.
+	webgraph = None					# Reference to webgraph instance.
+	server = None						# Reference to the server object.
 		
 	def getPinNr(pin):
 		"""Returns the pin number without device number."""
@@ -575,26 +502,12 @@ class globstuff:
 	def getThreadNr():
 		globstuff.threadnr +=1
 		return(globstuff.threadnr)
+		
+	def convertToPrec(self, data, places):
+		"""Returns the percentage value of the number."""
 
-	def setfile(trigger, channel, value):
-		"""Changes to the trigger values for watering are handeled here"""
-
-		if (trigger == "h"):
-			globstuff.ch_list[channel].hightrig = int(value)
-			t = 2
-		else:
-			globstuff.ch_list[channel].lowtrig = int(value)
-			t = 1
-		with open(globstuff.valvelist, "r", newline = "") as filestream:
-			file = csv.reader(filestream, delimiter = ",")
-			stuff = []
-			for line in file:
-				stuff.append(line)
-			stuff[channel + 1][t] = value
-		with open(globstuff.valvelist, "w", newline = "") as filestream:
-			file = csv.writer(filestream, delimiter = ",")
-			for i in stuff:
-				file.writerow(i)
+		m = ((data * 100) / float(globstuff.control.getADCres()))
+		return(str(round(m, places)))
 
 	def getCPUtemp():
 		"""Retruns the current CPU temperature in degrees C"""
@@ -656,7 +569,7 @@ class globstuff:
 		print("Cleaning up and exiting Main Thread")
 		for mcp in globstuff.mcplist:
 			mcp.allOff()
-		globstuff.socket.close()
+		globstuff.server.sslSock.close()
 		globstuff.sLED.off()
 		GPIO.cleanup()
 		print("Cleanup done.")
@@ -666,6 +579,6 @@ class globstuff:
 			command = "/usr/bin/sudo /sbin/shutdown {0} now".format(globstuff.shutdownOpt) # "/usr/bin/sudo /sbin/shutdown {0} now"
 			process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
 			output = process.communicate()[0]
-			print("Moi " + str(output))
+			print(output)
 
 		sys.exit()

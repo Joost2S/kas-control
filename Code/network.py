@@ -1,20 +1,18 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.0	16-08-2017
+# v1.0.2	07-01-2018
 
 from abc import ABCMeta, abstractmethod
 import csv
 from datetime import datetime
 import logging
-import RPi.GPIO as GPIO
 import socket
 import ssl
 import threading
 import time
 
 import globstuff
-import autowater as aw
 
 gs = globstuff.globstuff
 
@@ -52,15 +50,6 @@ class netCommand(object):
 	def help(self, help):
 		self.__help = help
 	
-#	args = {}
-#	[name] : (optional, values, priority, description)
-#	optional:	bool
-#	values:		{[name] : (type, values)}
-#	type:			min/max, absolute
-#	values:		(,)
-#	priority:	order in which to search
-#	description:	description for helpfile
-
 	@abstractmethod
 	def __init__(self):
 		pass
@@ -70,6 +59,15 @@ class netCommand(object):
 	def runCommand(self, args = None):
 		pass
 	
+	def channelCheck(self, container):
+		
+		try:
+			if (not (0 < int(container) <= gs.control.grouplen())):
+				raise Exception
+		except:
+			return(False, "Enter valid channel. (1 - {0})".format(gs.control.grouplen()))
+		return(True, "group" + str(container))
+
 	def isInt(self, intgr):
 		try:
 			i = int(intgr)
@@ -130,7 +128,7 @@ class cur(netCommand):
 		self.help = "Returns the current value of all the sensors."
 
 	def runCommand(self, args = None):
-		return(gs.currentstats)
+		return(gs.control.requestData())
 
 class tem(netCommand):
 
@@ -143,26 +141,18 @@ class tem(netCommand):
 
 	def runCommand(self, args = None):
 
-		msg = ""
 		if (args is not None):
-			for arg in args:
-				for td in gs.tDevList:
-					if (td.name.lower() == arg):
-						t = td.getTemp()
-						if (t == None):
-							t = "Could not get temp"
-						msg += "{0}:\t{1}\n".format(str(td.name), str(t))
-			if (msg == ""):
-				return("Temp device not found.")
-		else:
-			for td in gs.tDevList:
-				t = td.getTemp()
-				if (t == None):
-					t = "Could not get temp"
-				msg += "{0}:\t{1}\n".format(str(td.name), str(t))
-			if (msg == ""):
-				return("Error, no sensor. Please check the log for more information.")
-		return(msg)
+			temp = gs.control.requestData(args[0])
+			if (temp is None):
+				return("Invalid tempsensor.")
+			elif (temp == False):
+				return("Error retrieving temperature for sensor {}. See log for details.".format(output[0]))
+			else:
+				return("{} : {}".format(args[0]), temp)
+		txt = "Sensor\t| value\n"
+		for t in gs.control.requestData("temp"):
+			txt += "{}\t| {}".format(t[0], t[1])
+		return(txt)
 
 class mst(netCommand):
 
@@ -183,22 +173,14 @@ class mst(netCommand):
 		return(h)
 
 	def runCommand(self, args = None):
-
+		
 		if (args is not None):
-			check, group = self.isInt(args[0])
-			if (not check):
-				return("Enter a correct groupnumber. (1 - " + str(len(gs.ch_list)) + ")")
-			if (group >= 1 and group <= len(gs.ch_list)):
-				for g in gs.ch_list:
-					if (g.chan == (group - 1)):
-						if (g.connected):
-							return(str(gs.adc.getMeasurement(g.name, 1)))
-						else:
-							return("Sensor " + str(g.chan + 1) + " is disconnected. No value available.")
-			else:
-				return("Enter a correct groupnumber. (1 - " + str(len(gs.ch_list)) + ")")
-		else:
-			return("Enter a groupnumber. (1 - " + str(len(gs.ch_list)) + ").")
+			if (len(args) > 0):
+				check, chan = self.channelCheck(args[0])
+				if (not check):
+					return(chan)
+				return(gs.control.requestData())
+		return("Enter a groupnumber. (1 - " + str(len(gs.ch_list)) + ").")
 
 	def listConnected(self):
 		list = ""
@@ -486,7 +468,11 @@ class spf(netCommand):
 		self.help += "Isn't working yet."
 
 	def runCommand(self, args = None):
-		return("Not yet implemented.")
+		
+		if (gs.control.toggleSpoof()):
+			return("Spoofmode enabled.")
+		else:
+			return("Spoofmode disabled.")
 
 class flt(netCommand):
 
@@ -559,16 +545,28 @@ class pst(netCommand):
 		
 class set(netCommand):
 
+	"""
+	network: check datatypes and container
+	control: check if triggers are allowed to be set
+				check if values are valid
+	group:	(auto) set triggers and enable container if values are good
+	db:		Values are written to db if container enabled
+	"""
+
 	def __init__(self):
 		self.command = "set"
 		self.name = "Set"
-		self.args = "'low'\t'high'\t%channel\t%value"
+		self.args = "%channel\t'low'\t'high'\t%value"
 		self.help = "Use this command to set a new value for what moisture level is wanted.\n"
 		self.help += "Arguments:\n"
+		self.help += "%container\t\tNumber of container to change.\n"
 		self.help += "trigger\t'low'\tcontrols when the pumping starts. Select how dry the soil can become.\n"
 		self.help += "\t'high'\tcontrols how wet the soil may become.\n"
-		self.help += "channel\t\tWhich channel to change.\n"
 		self.help += "value\t\tSelect the value for the channel. (200 - 4000)\n"
+		self.help += "Altrnative:\n"
+		self.help += "%container\t\tNumber of container to change.\n"
+		self.help += "%lowValue\tEnter value for lower trigger.\n"
+		self.help += "%highValue\tEnter value for higher trigger.\n"
 
 	def runCommand(self, args = None):
 		"""set values for min and max soilmoisture level."""
@@ -576,42 +574,41 @@ class set(netCommand):
 		trig = ""
 		chan = 0
 		value = 0
+		lowval = 0
 		if (args is not None):
-			if (not (args[0] == "low" or args[0] == "high")):
-				return("Enter 'low' or 'high' as first argument.")
-			trig = args[0]
-			if (len(args) > 1):
-				check, chan = self.isInt(args[1])
+			if (len(args) > 0):
+				check, chan = self.channelCheck(args[0])
 				if (not check):
-					return("Enter valid channel. (1 - {0})".format(str(len(gs.ch_list))))
-				elif (not (0 < chan <= len(gs.ch_list))):
-					return("Enter valid channel. (1 - {0})".format(str(len(gs.ch_list))))
-				chan -= 1
-				if (len(args) > 2):
-					check, value = self.isInt(args[2])
-					if (not check):
-						return("Enter valid value.")
-					if (trig == "low"):
-						if (not (200 <= value < gs.ch_list[chan].hightrig)):
-							return("Invalid value. ({0} - {1})".format(200, gs.ch_list[chan].hightrig - 1))
+					return(chan)
+				if (len(args) == 3):
+					if (not (args[1] == "low" or args[1] == "high")):
+						try:
+							lowval = int(args[1])
+						except:
+							return("Enter 'low' or 'high' as first argument.")
+					else:
+						trig = args[1]
+					try:
+						value = int(args[2])
+					except:
+						return("Incorrect value for trigger.")
+					if (trig == ""):
+						return(gs.control.setTriggers(chan, lowval, value))
+					elif (trig == "low"):
+						return(gs.control.setTriggers(chan, low = value))
 					if (trig == "high"):
-						if (not (gs.ch_list[chan].lowtrig < value <= 4000)):
-							return("Invalid value. ({0} - {1})".format(gs.ch_list[chan].lowtrig + 1, 4000))
-					gs.setfile(trig[0], chan, value)
-					if (trig == "low"):
-						value = gs.ch_list[chan].lowtrig
-					if (trig == "high"):
-						value = gs.ch_list[chan].hightrig
-					return ("New value of {0}range on channel {1}: {2}".format(trig, str(gs.ch_list[chan].chan), value))
-		return("Enter arguments to set.")
-		
+						return(gs.control.setTriggers(chan, high = value))
+				elif (len(args) == 1):
+					return(gs.control.setTriggers(chan, value))
+		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
+
 class get(netCommand):
 
 	def __init__(self):
 		self.command = "get"
 		self.name = "Get"
 		self.args = "%channel"
-		self.help = "Returns the min, current and max values for each soil sensor\n"
+		self.help = "Returns the min, current and max values for all soil sensors\n"
 		self.help += "or just the selected soil sensor.\n"
 		self.help += "Arguments:\n"
 		self.help += "channel\tenter a channel number if the values of only one soil sensor needs to be displayed."
@@ -621,21 +618,24 @@ class get(netCommand):
 
 		reply = ""
 		if (args is not None):
-			check, chan = self.isInt(args[0])
-			if (not check):
-				return("Enter valid channel. (1 - " + str(len(gs.ch_list)) + ").")
-			elif (not (0 < chan <= len(gs.ch_list))):
-				return("Enter valid channel. (1 - " + str(len(gs.ch_list)) + ").")
-			chan -= 1
-			reply += ("Values of group " + str(gs.ch_list[chan].chan) + ":\n")
-			reply += ("Low\t|Now\t|High\n")
-			reply += (str(gs.ch_list[chan].lowtrig) + "\t|" + str(gs.adc.getMeasurement(gs.ch_list[chan].name, 0)) + "\t|" + str(gs.ch_list[chan].hightrig))
-			return (reply)
-		else:
-			reply += ("Group\t|Low\t|Now\t|High\n")
-			for g in gs.ch_list:
-				reply += str(g.chan + 1) + "\t|" + (str(g.lowtrig) + "\t|" + str(gs.adc.getMeasurement(g.name, 0)) + "\t|" + str(g.hightrig) + "\n")
-			return(reply)
+			if (len(args) == 1):
+				check, chan = self.channelCheck(args[0])
+				if (not check):
+					return(chan)
+				reply += ("Values of group " + str(gs.ch_list[chan].chan) + ":\n")
+				reply += ("Low\t|Now\t|High\n")
+				reply += (str(gs.ch_list[chan].lowtrig) + "\t|" + str(gs.adc.getMeasurement(gs.ch_list[chan].name, 0)) + "\t|" + str(gs.ch_list[chan].hightrig))
+				return (reply)
+			return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
+
+		reply += ("Group\t|Low\t|Now\t|High\n")
+		for i in range(gs.control.grouplen()):
+			name = "group" + str(i + 1)
+			lt, ht = gs.control.getTriggers(name)
+			lvl = gs.control.requestData("soil-g" + str(i + 1))
+			name = gs.control.getGroupName(name)
+			reply += "{}\t|{}\t|{}\t|{}\n".format(name, lt, lvl, ht)
+		return(reply)
 
 class gra(netCommand):
 
@@ -698,9 +698,9 @@ class gra(netCommand):
 				elif (len(names) == 0):
 					# No names where entered. Passing None to the makeGraph script so all sensor output will be shown.
 					names = None
-				msg = gs.wgraph.makeGraph(start, end, names)
+				msg = gs.webgraph.makeGraph(start, end, names)
 			else:
-				msg = gs.wgraph.makeGraph(start)
+				msg = gs.webgraph.makeGraph(start)
 			if (msg == None):
 				msg = "Done."
 			return(msg)
@@ -795,6 +795,51 @@ class log(netCommand):
 
 		return(msg)
 
+class adp(netCommand):
+	"""
+	The name and type of the plant are seperated by a comma to enable users to
+	enter multi-word plant names en species.
+	"""
+
+	def __init__(self):
+
+		self.command = "addplant"
+		self.name = "Add plant"
+		self.args = "%container\t%plantName\t%plantType%"
+		self.help  = ""
+
+	def runCommand(self, args = None):
+		
+		name = None
+		type = None
+		if (args is not None):
+			if (len(args) >= 2):
+				check, chan = self.channelCheck(args[0])
+				if (not check):
+					return(chan)
+				txt = ""
+				for arg in args[1:]:
+					txt += str(arg) + " "
+				if (txt.find(",",) is not -1):
+					list = txt.split(",", 1)
+					name = list[0]
+					type = list[1]
+				else:
+					name = txt.strip()
+				return(gs.control.addPlant(chan, name, type))
+		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
+
+class rmp(netCommand):
+
+	def __init__(self):
+		self.command = "remplant"
+		self.name = "Remove plant"
+		self.args = "%plantName or %groupnr"
+		self.help = ""
+
+	def runCommand(self, args = None):
+		pass
+
 class Server(object):
 	
 	# commands
@@ -829,12 +874,12 @@ class Server(object):
 					 vts(), wts(), tsm(),
 					 spf(), flt(), dlg(),
 					 pst(), set(), get(),
-					 gra(), log() ]
+					 gra(), log(), adp(),
+					 rmp() ]
 
 		for command in comms:
 			self.commands[command.command] = command
-		del(comms)
-
+		gs.server = self
 
 	def makeSocket(self):
 		"""Create a network connection to start the server."""
@@ -852,7 +897,6 @@ class Server(object):
 												certfile = gs.dataloc + "cert.pem",
 												keyfile = gs.dataloc + "key.pem")
 		print("Socket secured.")
-		gs.socket = self.sslSock
 
 		while(1):
 			if (gs.port == 7505):
@@ -869,8 +913,7 @@ class Server(object):
 		
 		self.sslSock.listen(10)
 		print("Socket now listening")
-		
-
+	
 	def serverLoop(self):
 		"""Main loop, waiting to accept new connections."""
 		
@@ -881,7 +924,7 @@ class Server(object):
 								
 				if (addr[0] != "127.0.0.1"):
 					try:
-						nt = client(gs.getThreadNr(), "client-" + str(self.clientNr), args = (conn, addr[0], str(addr[1]), self))
+						nt = client(gs.getThreadNr(), "client-" + str(self.clientNr), args = (conn, addr[0], str(addr[1])))
 						nt.start()
 						gs.draadjes.append(nt)
 					except ConnectionResetError:
@@ -977,7 +1020,7 @@ class Server(object):
 class client(globstuff.protoThread):
 	def run(self):
 		print("Starting thread{0}: {1}".format(self.threadID, self.name))
-		self.args[3].clientthread(self.args[0], self.args[1], self.args[2])
+		gs.server.clientthread(self.args[0], self.args[1], self.args[2])
 		print("Exiting thread{0}: {1}".format(self.threadID, self.name))
 
 class shutdownError(Exception):

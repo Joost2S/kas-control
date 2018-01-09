@@ -22,9 +22,10 @@ class shutdownError(Exception):
 class kasControlClient(object):
 	
 	host = "kas-control"
-	ipList = [("", "Login from home."),
-				("", "Login from remote location."),
-				("", "Login from test location.")
+	ipList = [("217.120.75.46", "Login remote."),
+				("217.123.221.17", "Login from remote location."),
+				("192.168.1.225", "Login from home."),
+				("192.168.1.157", "Login from test location.")
 				]
 	ipAddr = ""
 	port = 7500
@@ -46,6 +47,7 @@ class kasControlClient(object):
 		self.htmlFile = self.dir + "graph.html"
 
 	def makeConnection(self):
+
 		try:
 			s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		except socket.error as msg:
@@ -79,9 +81,11 @@ class kasControlClient(object):
 			else:
 				self.port -= 5
 		print("Receiving...")
-		print(self.sslSocket.recv(256).decode())	# Get welcome message
+		# Get welcome message
+		print(self.sslSocket.recv(256).decode())
 
 	def client(self):
+
 		try:
 			while (True):
 				if (self.loop):
@@ -128,6 +132,7 @@ class kasControlClient(object):
 		return(i, data)
 
 	def showgraph(self, data):
+
 		try:
 			with open(self.htmlFile, "wb") as text_file:
 				print("writing to file")
@@ -143,7 +148,7 @@ class kasControlClient(object):
 		
 #		open browser to display file.
 		url = "file://" + self.htmlFile
-		webbrowser.open(url,new=2)
+		webbrowser.open(url, new = 2)
 		return("Done.")
 
 	def shutdown(self):
@@ -152,9 +157,9 @@ class kasControlClient(object):
 		self.sslSocket.close()
 		sys.exit()
 
-client = kasControlClient()
-client.makeConnection()
 try:
+	client = kasControlClient()
+	client.makeConnection()
 	client.client()
 except KeyboardInterrupt:
 	print("Shutdown by keyboard.")

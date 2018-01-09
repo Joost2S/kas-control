@@ -10,11 +10,13 @@ Make an HTML graph.
 from datetime import datetime
 import logging
 import sqlite3
+import globstuff
+
+gs = globstuff.globstuff
 
 
 class webgraph(object):
 
-	db = None
 	pageName = ""
 	min = []
 	avg = []
@@ -28,13 +30,13 @@ class webgraph(object):
 	selection = []
 
 
-	def __init__(self, db):
+	def __init__(self):
 		
-		self.db = db
-		for f in self.db.fields:
+		for f in gs.db.fields:
 			self.names.append(f[0].lower())
-		self.htmlFile = self.db.dbfolder + "graph.html"
+		self.htmlFile = gs.dataloc + "graph.html"
 		self.pageName = "Raspberry Pi Data Logger"
+		gs.webgraph = self
 
 	def makeGraph(self, start, end = None, names = None):
 
@@ -106,7 +108,7 @@ class webgraph(object):
 			chart_code += ", '{}'".format(self.names[i])
 		print(self.selection)
 		chart_code += "],\n"
-		chart_code += self.format_table()
+		chart_code += self.formatTable()
 		chart_code += """
 				]);
 
@@ -125,7 +127,7 @@ class webgraph(object):
 	
 	def show_graph(self):
 		text = ("<h2>Temperature Chart</h2>")
-		text +=('<div id="chart_div" style="width: 1680; height: 880;"></div>')
+		text +=('<div id="chart_div" style="width: 2560; height: 1280;"></div>')
 		return(text)
 	
 	def show_stats(self):
@@ -150,7 +152,7 @@ class webgraph(object):
 
 		msg = ""
 		for i, t in zip(self.selection, table):
-			type = self.db.fields[i][1]
+			type = gs.db.fields[i][1]
 			if ((type == "light") or (type == "mst")):
 				msg += "<TD ALIGN = 'center'><h3>{0} ({1})</h3></TD>".format(str(t), self.perc(t))
 			else:
@@ -162,15 +164,15 @@ class webgraph(object):
 
 		return(min, max, avg)
 
-	def format_table(self):
+	def formatTable(self):
 		"""Returns a formatted table of the graph data and calculates min, avg and max values per data type."""
 
 		chart_table = ""
-		rows = self.db.display_data(self.querystart, self.queryEnd, raw = True)
+		rows = gs.db.display_data(self.querystart, self.queryEnd, raw = True)
 		for row in rows:
 			try:
 				chart_table += "\t\t\t\t['{0}'{1}],\n".format(str(datetime.fromtimestamp(int(row[0])).strftime("%Y-%m-%d %H:%M:%S")), self.formatRow(row[1:]))
-			except fieldException as txt:
+			except FieldException as txt:
 				return(txt)
 
 			for i, j in enumerate(self.selection):
@@ -192,18 +194,18 @@ class webgraph(object):
 		if (len(row) <= len(self.names)):
 			data = ""
 			for i in self.selection:
-				type = self.db.fields[i][1]
+				type = gs.db.fields[i][1]
 				if ((type == "light") or (type == "mst")):
 					data += (", " + self.perc(row[i]))
 				else:
 					data += (", " + str(row[i]))
 			return(data)
 		else:
-			raise fieldException("Incorrect amount of datafields.")
+			raise FieldException("Incorrect amount of datafields.")
 
 	def perc(self, number):
 
-		return(str(round((number / self.db.adc.bits * 100), 2)))
+		return(str(round((number / gs.control.getADCres * 100), 2)))
 	
-class fieldException(Exception):
+class FieldException(Exception):
 	pass

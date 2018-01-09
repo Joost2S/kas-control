@@ -1,0 +1,33 @@
+
+#light
+#lightname, lightchan
+ambientl, 7
+
+#temp
+#tempname, temploc
+out_sun, 03168bf394ff
+out_shade, 000006d218ac
+ambientt, 000006d218ac
+psu, None
+
+# cputemp
+cpu, cpu
+
+# flow
+# flowname, flowpin
+total, 14
+
+# pwr
+# name, addr, R
+5v, 0x40, 0.04
+12v, 0x45, 0.04
+#
+# group
+# vpin, ff1, ff2, adcChan, flowpin, temploc
+	1A3, 0A6, 0A7,	0,			 15,		None
+	1A4, 0A4, 0A5,	1,			 17,		None
+	1A5, 0A2, 0A3,	2,			 18,		None
+	1A6, 1B1, 0B0,	3,			 27,		None
+	1A7, 1B3, 0B2,	4,			1B6,		000006d218ac
+	1A1, 1B5, 0B4,	5,			1B7,		03168bf394ff
+#	1A2, 1B7, 0B6,	6,			None,		None
