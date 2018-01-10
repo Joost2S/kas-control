@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.2.3	06-01-2018
+# v0.3	09-01-2018
 
 import calendar
 from datetime import datetime, timedelta
@@ -42,29 +42,29 @@ class Reprinter:
 	
 class Database(object):
 	
-	__allowedTypes = ["mst", "temp", "cputemp", "light", "flow", "pwr"]
-	__fields = [["light", "light"],
-				 ["inside", "temp"],
-				 ["outside", "temp"],
-				 ["PSU", "temp"],
-				 ["CPU", "cputemp"],
-				 ["total", "flow"],
-				 ["soil_g1", "mst"],
-				 ["soil_g2", "mst"],
-				 ["soil_g3", "mst"],
-				 ["soil_g4", "mst"],
-				 ["temp_g1", "temp"],
-				 ["temp_g2", "temp"],
-				 ["temp_g3", "temp"],
-				 ["temp_g4", "temp"],
-				 ["flow_g1", "flow"],
-				 ["flow_g2", "flow"],
-				 ["flow_g3", "flow"],
-				 ["flow_g4", "flow"]]
-	__groups = [["group1", ["soil_g1", "temp_g1", "flow_g1"]],
-				 ["group2", ["soil_g2", "temp_g2", "flow_g2"]],
-				 ["group3", ["soil_g3", "temp_g3", "flow_g3"]],
-				 ["group4", ["soil_g4", "temp_g4", "flow_g4"]]]
+	__allowedTypes = ["mst", "light", "flow", "temp", "cputemp", "pwr"]
+	__fields = {"light" : "light",
+				 "inside" : "temp",
+				 "outside" : "temp",
+				 "PSU" : "temp",
+				 "CPU" : "cputemp",
+				 "total" : "flow",
+				 "soil_g1" : "mst",
+				 "soil_g2" : "mst",
+				 "soil_g3" : "mst",
+				 "soil_g4" : "mst",
+				 "temp_g1" : "temp",
+				 "temp_g2" : "temp",
+				 "temp_g3" : "temp",
+				 "temp_g4" : "temp",
+				 "flow_g1" : "flow",
+				 "flow_g2" : "flow",
+				 "flow_g3" : "flow",
+				 "flow_g4" : "flow"}
+	__groups = {"group1" : ["soil_g1", "temp_g1", "flow_g1"],
+				 "group2" : ["soil_g2", "temp_g2", "flow_g2"],
+				 "group3" : ["soil_g3", "temp_g3", "flow_g3"],
+				 "group4" : ["soil_g4", "temp_g4", "flow_g4"]}
 	__fileName = os.path.dirname(os.path.realpath(__file__)) + "/datalog.db"
 	__plantTypes = ["Generic", "Weed", "Cannabis", "Marijuana", "Hemp", "Tomato", "Chili pepper"]
 	__tables = ["sensorData","sensorSetup","groups","plants","plantTypes","watering"]
@@ -198,13 +198,13 @@ class Database(object):
 
 		# Creating sensorData table...
 		sensorData = "CREATE TABLE sensorData (timestamp DATETIME NOT NULL"
-		for f in self.__fields:
-			sensorData += ", " + f[0]
-			if (f[1] in self.__allowedTypes[1:2]):
+		for fn, ft in self.__fields.items():
+			sensorData += ", " + fn
+			if (ft in self.__allowedTypes[:3]):
 				sensorData += " REAL"
 			else:
 				sensorData += " INTEGER"
-			sensorData += " NOT NULL"
+			sensorData += " NULL"
 		sensorData += ");"
 
 		# Creating sensorSetup table...
@@ -217,17 +217,17 @@ class Database(object):
 			
 		# Gathering data for sensorSetup table...
 		sensorSData = []
-		subquery = "NULL"
-		for i, f in enumerate(self.__fields):
+		for i, fn, ft in enumerate(self.__fields.items()):
+			subquery = "NULL"
 			res = "NULL"
-			if (f[1] == "mst" or f[1] == "light"):
+			if (ft == "mst" or ft == "light"):
 				res = "4095"
-			for g in self.__groups:
-				if (f[0] in g[1]):
-					subquery = "(SELECT groupID FROM groups WHERE groupName = '{}')".format(g[0])
+			for n, g in self.__groups.items():
+				if (fn in g):
+					subquery = "(SELECT groupID FROM groups WHERE groupName = '{}')".format(n)
 					break
 			sensorSData.append("INSERT INTO sensorSetup(sensorName, sensorType, groupID, resolution)")
-			sensorSData[i] += " VALUES ('{}', '{}', {}, {});".format(f[0], f[1], subquery, res)
+			sensorSData[i] += " VALUES ('{}', '{}', {}, {});".format(fn, ft, subquery, res)
 		
 		# Creating groups table...
 		groups  = "CREATE TABLE groups ("
@@ -342,6 +342,11 @@ class Database(object):
 		dbmsg4 = "UPDATE groups SET plantID = (SELECT max(plantID) FROM plants) WHERE groupID = {};".format(group)
 		self.__dbWrite(dbmsg3, dbmsg4)
 		self.lastResult = True
+		
+	def __addSpecies(self, species):
+
+		dbmsg = "INSERT INTO plantTypes(species) VALUES('{}');".format(species.title())
+		self.__dbWrite(dbmsg)
 
 	def removePlant(self, plantName):
 		"""
@@ -393,19 +398,16 @@ class Database(object):
 	def wateringEvent(self, group, start, end, amount):
 
 		if (not (0 < group <= len(self.__groups))):
-			print("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
-			return
+			logging.info("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
+			return(False)
 		subquery = "SELECT plantID FROM groups WHERE groupID = {}".format(group)
 		query = "INSERT INTO watering (plantID, starttime, endtime, amount) "
 		query += "VALUES (({}), {}, {}, {});".format(subquery, start, end, amount)
 		rows = self.__dbWrite(query)
 		if (rows == 0):
-			print("Failed to add Watering event.")
-
-	def __addSpecies(self, species):
-
-		dbmsg = "INSERT INTO plantTypes(species) VALUES('{}');".format(species.title())
-		self.__dbWrite(dbmsg)
+			logging.error("Failed to add Watering event.")
+			return(False)
+		return(True)
 
 	def getTriggers(self, group):
 		
@@ -442,6 +444,52 @@ class Database(object):
 		query  += "where p.groupID = {} group by p.plantID".format(group)
 		data = self.__dbWrite(query)
 
+	def getSensorData(self, start, end = 0.0, names = None, types = None, group = None):
+		"""Returns a 2D array with the sensor data. First row contains the names."""
+		
+		st = float(time.time()) - float(start)*60*60*24
+		if (end > 0):
+			en = "AND timestamp < {};".format(float(time.time()) - float(end)*60*60*24)
+		else:
+			en = ";"
+		sel = ""
+		if (names is not None):
+			if (isinstance(names, str)):
+				names = [names]
+			for n in names:
+				if (n in self.__fields.keys()):
+					sel += "{}, ".format()
+			if (len(sel) != 0):
+				sel = sel[:-2]
+			else:
+				return(None)
+		elif (types is not None):
+			if (isinstance(types, str)):
+				types = [types]
+			for t in types:
+				for fn, ft in self.__fields.items():
+					if (ft == t):
+						sel += "{}, ".format(fn)
+			if (len(sel) != 0):
+				sel = sel[:-2]
+			else:
+				return(None)
+		elif (group is not None):
+			if (group in self.__groups.keys()):
+				for name in self.__groups[group]:
+					sel += "{}, ".format(name)
+				sel = sel[:-2]
+			else:
+				return(None)
+		else:
+			sel = "*"
+		query = "SELECT {} FROM sensorData WHERE timestamp > {} {}".format(sel, st, en)
+		snames = sel.split(",")
+		data = self.__dbRead(query)
+		if (data is None):
+			return(None)
+		return(snames.extend(data))
+
 	def __dbRead(self, dbmsg):
 		"""
 		Use this method to send queries to the DB.
@@ -453,17 +501,20 @@ class Database(object):
 #			try:
 			with sql.connect(self.__fileName) as conn:
 				curs = conn.cursor()
-				for row in curs.execute(dbmsg):
-					a = []
-					for t in row:
-						a.append(t)
-					dat.append(a)
+				data = curs.execute(dbmsg)
+				if (data is None):
+					return(None)
+				else:
+					for row in data:
+						a = []
+						for t in row:
+							a.append(t)
+						dat.append(a)
 #			except:
 #				print("crap")
 #			finally:
 #				conn.close()
 		return(dat)
-		text = ""
 		for line in dat:
 			self.__printutf(line)
 			
@@ -529,28 +580,27 @@ class Database(object):
 	def datalog(self):
 		"""This is the main datalogging method. Every %interval minutes the data will be recorded into the database."""
 
-		# Checking the last entry in the db to ensure recordings are synced to __interval
-		le = time.time() - self.get_last_data()
-		logging.debug("Last entry: " + str(le) + " seconds ago.")
+		# Waiting to ensure recordings are synced to __interval
 		timeRes = self.__interval * 60.0
-		if (le < timeRes):
-			while (int(time.time()) % timeRes != timeRes - 1):
-				time.sleep(1)
-				if (not gs.running):
-					return
-			while(1):
-				if (int(time.time()) % timeRes == 0):
-					break
-				else:
-					time.sleep(0.01)
+		while (int(time.time()) % timeRes != timeRes - 1):
+			time.sleep(1)
+			if (not gs.running):
+				return
+		while(1):
+			if (int(time.time()) % timeRes == 0):
+				break
+			else:
+				time.sleep(0.01)
 
 		# Datalogging loop.
 		while (gs.running):
 			if (not self.pause):
 				start = time.time()
-				dbmsg = ("INSERT INTO sensorData VALUES({}".format(int(time.time())))
-				for f in self.__fields:
-					dbmsg += ", " + str(self.__getValue(f[0]))
+				txt1 = "INSERT INTO sensorData(timestamp"
+				txt2 = ")VALUES({}".format(int(time.time()))
+				for n, f in self.__fields.items():
+					txt1 += ", " + str(n)
+					txt2 += ", " + str(self.__getValue(f))
 				dbmsg += (");")
 				self.__dbWrite(dbmsg)
 
@@ -574,7 +624,7 @@ class Database(object):
 			if (data is not False):
 				return(data)
 		logging.warning("Failed to get a measurement for sensor {}.".format(name))
-		return(0)
+		return("NULL")
 		
 	
 class dbVaildationError(Exception):

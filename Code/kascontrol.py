@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.7.5	07-01-2018
+# v0.7.6	09-01-2018
 
 import logging
 import RPi.GPIO as GPIO
@@ -51,8 +51,9 @@ try:
 	webgraph.webgraph()
 	network.Server()
 	# Adding buttons:
-	pushbutton.stopButton(gs.button0pin)
-	pushbutton.lightToggle(gs.LCD_L, gs.button1pin)
+	if (gs.hwOptions["buttons"]):
+		pushbutton.stopButton(gs.button0pin)
+		pushbutton.lightToggle(gs.LCD_L, gs.button1pin)
 	
 	# Getting the MCP23017 GPIO expanders ready for use:
 	for mcp in gs.mcplist:

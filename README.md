@@ -25,10 +25,11 @@ Future Features
 - 2 configurable LEDbars.
 - Network
   - Full-fledged GUI for the network client.
-  - Webcam support so you can watch your plants from all over the world
+  - rPi camera support so you can watch your plants from all over the world
 - Database
   - Adding results such as plant size or harvest amount to each of your plants. Manual input only of course.
 - 5v/12v PSU PCB with INA219 power monitor
+- Use eventhooks
 
 Motivation
 ----------
@@ -43,6 +44,7 @@ Installation/requirements
 - RPi.GPIO
 - SMBus for i2c
 - spidev for SPI
+- SQlite for database
 
 
 Contributors

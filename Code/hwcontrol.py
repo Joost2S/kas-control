@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.7	06-01-2018
+# v0.9.8	09-01-2018
 
 import csv
 from datetime import datetime, timedelta
@@ -29,7 +29,7 @@ class hwControl(object):
 	# and accessing them in various ways.
 	__chanlist = []			# Should be removed in future version
 	__groups = {}				# Dict with group instances. {name : group}
-	__sensors = {}				# {name : (addr/obj, type)}
+	__sensors = {}				# {name : type}
 	__otherSensors = []		# List of sensor names that are not part of any group.
 	__adc = None				# u1
 	__tempMGR =  None			# Manager for DS18B20 temperature sensors
@@ -61,7 +61,7 @@ class hwControl(object):
 		gs.control = self
 
 
-	def requestData(self, type = None, name = None, caller = None):
+	def requestData(self, type = None, name = None, caller = None, perc = False):
 		""""""
 
 		if (self.__spoof):
@@ -70,10 +70,12 @@ class hwControl(object):
 			# Get data from specific sensor.
 			if (name is not None):
 				if (name in self.__sensors.keys()):
+					if (type is not None and type is not self.__sensors[name]):
+						return("Sensor {} is not of type {}.".format(name, type))
 					type = self.__sensors[name][1]
 					if (type == "mst"):
 						if (caller == "db" or caller == "wtr"):
-							return(self.__adc.getMeasurement(name, 0))
+							return(self.__adc.getMeasurement(name, perc))
 						else:
 							for g in self.__groups.values():
 								if (g.mstName == name):
@@ -84,10 +86,10 @@ class hwControl(object):
 									elif (not g.enabled):
 										return("NoPlant")
 									else:
-										return(self.__adc.getMeasurement(name, 0))
+										return(self.__adc.getMeasurement(name, perc))
 						return(None)
 					if (type == "light"):
-						return(self.__adc.getMeasurement(name, 0))
+						return(self.__adc.getMeasurement(name, perc))
 					if (type == "cputemp"):
 						return(gs.getCPUtemp())
 					if (type == "flow"):
@@ -113,10 +115,25 @@ class hwControl(object):
 				else:
 					logging.warning("Requested sensor does not exist. Name: {}".format(name))
 					return(False)
+			elif (name in self.__groups.keys()):
+				if (type == "mst"):
+					return(self.__groups[name].getM())
+				elif (type == "temp"):
+					return(self.__groups[name].getT())
+				elif (type == "flow"):
+					return(self.__groups[name].getF())
 			# Get data from all sensors of specified type.
 			# return [[sensorname, value], ...]
 			elif (type is not None):
-				pass
+				data = []
+				for n, t in self.__sensors.items():
+					if (t == type):
+						val = self.requestData(n)
+						if (val == False):
+							val = "Error"
+						data.append([n, val])
+				return(data)
+
 			# Get all data.
 			else:
 				return(self.__currentstats)
@@ -298,8 +315,8 @@ class hwControl(object):
 
 		gs.getPinDev(ff1).setPin(gs.getPinNr(ff1), False)
 		gs.getPinDev(ff2).setPin(gs.getPinNr(ff2), False)
-		gs.adc.setChannel(name, channel, ff1, ff2, gs.getPinDev(g.ff1))
-		self.__sensors[name] = (channel, "mst")
+		gs.adc.setChannel(name, channel, ff1, ff2, gs.getPinDev(ff1))
+		self.__sensors[name] = "mst"
 		return(name)
 
 	def __setTemplate(self):
@@ -367,9 +384,9 @@ class hwControl(object):
 				gm = []	# Group moist data
 				gt = []	# Group temp data
 				gf = []	# Group flow data
-				for group in self.__groups.values():
-					n = group.getName()
-					m, t, f = group.getSensorData()
+				for g in self.__groups.values():
+					n = g.getName()
+					m, t, f = g.getSensorData()
 					gn.append(n)
 					gm.append(m)
 					gt.append(t)
@@ -426,7 +443,8 @@ class hwControl(object):
 		"""Checks and sets wether a sensor is connected to each channel of the ADC."""
 
 		for g in self.__groups.values():
-			locked = self.__adc.getMeasurement(g.mstName, 0)
+			lvl = self.__adc.getMeasurement(g.mstName)
+			locked = lvl < self.__connectedCheckValue
 			if (locked == g.connected):
 				g.connected = not g.connected
 				if (locked):
@@ -463,7 +481,12 @@ class hwControl(object):
 
 		data = []
 		for n, g in self.__groups.items():
-			data.append([n, [g.mstName, g.tempName, g.flowName]])
+			names = [g.mstName]
+			if (gs.hwOptions["soiltemp"] and g.tempName is not None):
+				names.append(g.tempName)
+			if (gs.hwOptions["flowsensors"] and g.flowName is not None):
+				names.append(g.flowName)
+			data.append([n, names])
 		return(data)
 
 	def getADCres(self):

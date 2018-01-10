@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.0.2	07-01-2018
+# v1.0.3	09-01-2018
 
 from abc import ABCMeta, abstractmethod
 import csv
@@ -67,6 +67,22 @@ class netCommand(object):
 		except:
 			return(False, "Enter valid channel. (1 - {0})".format(gs.control.grouplen()))
 		return(True, "group" + str(container))
+	
+	def getTabs(self, txt, tabs = 2, tablength = 8):
+		"""Returns a tring of a fixed length for easier formatting of tables. Assuming your console has a tab length of 8 chars."""
+
+		size = tabs * tablength
+		if (len(txt) > size):
+			return(txt[:size])
+		elif (len(txt) == size):
+			return(txt)
+		elif (tablength == 8):
+			t = int(size / len(txt))
+			if (size % len(txt) != 0):
+				t += 1
+			return(txt + "\t" * t)
+		else:
+			return(txt + " " * (tabs * tablength - len(txt)))
 
 	def isInt(self, intgr):
 		try:
@@ -124,7 +140,7 @@ class cur(netCommand):
 	def __init__(self):
 		self.command = "cur"
 		self.name = "Current stats"
-		self.args = ""
+		self.args = None
 		self.help = "Returns the current value of all the sensors."
 
 	def runCommand(self, args = None):
@@ -149,9 +165,13 @@ class tem(netCommand):
 				return("Error retrieving temperature for sensor {}. See log for details.".format(output[0]))
 			else:
 				return("{} : {}".format(args[0]), temp)
-		txt = "Sensor\t| value\n"
-		for t in gs.control.requestData("temp"):
-			txt += "{}\t| {}".format(t[0], t[1])
+		txt = "Sensor\t\t| value\n"
+		data = gs.control.requestData("temp")
+		if (len(data) > 0):
+			for t in data:
+				txt += "{}| {}".format(self.getTabs(t[0]), t[1])
+		else:
+			txt = "No temperature devices found."
 		return(txt)
 
 class mst(netCommand):
@@ -166,6 +186,8 @@ class mst(netCommand):
 		self.help.append(self.listConnected())
 
 	def returnHelp(self):
+		"""Updates the last line of the help text to reflect the currently connected sensors."""
+
 		self.help[-1] = self.listConnected()
 		h = ""
 		for line in self.help:
@@ -179,7 +201,7 @@ class mst(netCommand):
 				check, chan = self.channelCheck(args[0])
 				if (not check):
 					return(chan)
-				return(gs.control.requestData())
+				return(gs.control.requestData(chan, "mst"))
 		return("Enter a groupnumber. (1 - " + str(len(gs.ch_list)) + ").")
 
 	def listConnected(self):
@@ -198,20 +220,59 @@ class dat(netCommand):
 	def __init__(self):
 		self.command = "data"
 		self.name = "Data"
-		self.args = "%start, %end%"
+		self.args = "%start\t%end%\t%names | types | group%"
 		self.help = "Displays the last entries from the logging database.\n\n"
 		self.help += "%start\tamount of days ago you want to start the log.\n"
-		self.help += "%end\twhen you want to stop the log. If not entered 0 will be assumed.\n"
-		self.help += "%start and %end% can be entered in fractions."
+		self.help += "%end%\twhen you want to stop the log. If not entered 0 will be assumed.\n"
+		self.help += "%start and %end% can be entered in fractions.\n"
+		self.help += "%names%\tEnter the name(s) of the sensors you want read.\n"
+		self.help += "%-types%Read all sensors of type(s).\n"
+		self.help += "%--group%Enter container number to get associated sensors read.\n"
+		self.help += "Choose max one from names, types and group.\n"
+		self.help += "Examples:\n"
+		self.help += "'data 5'\n"
+		self.help += "Get data from all sensors over last 5 days.\n\n"
+		# Future version: Support plantname
+		self.help += "'data 4 2 --2'\n"
+		self.help += "Get data from the sensors from container 2 over the last 4 days.\n"
+		self.help += "'data 0.75 0.25 ambientl out_shade totalw'\n"
+		self.help += "Get data from the 3 sensors from 18h - 6h ago.\n"
+		self.help += "'data 7 -temp pwr'\n"
+		self.help += "Get data from all temp and power sensors over the last week."
 
 	def runCommand(self, args = None):
+
 		start = 0.0
 		end = 0.0
+		type = None
+		names = None
 		if (args is not None):
+			try:
+				end = float(args[1])
+				del(args[1])
+			except:
+				pass
 			if (len(args) > 1):
-				check, end = self.isFloat(args[1])
-				if (not check):
-					return("Wrong value for %end. " + end)
+				if (args[1][0] == "-"):
+					if (args[1][1] == "-"):
+						check, chan = self.channelCheck(args[0])
+						if (not check):
+							return(chan)
+						type = "group"
+						names = chan
+					else:
+						type = "types"
+						if (len(args) > 2):
+							names = []
+							names.append(args[1][1:])
+							for a in args[2:]:
+								names.append(a)
+						else:
+							names = args[1][1:]
+				elif (isinstance(types, str)):
+					check, end = self.isFloat(args[1])
+					if (not check):
+						return("Wrong value for %end. " + end)
 			check, start = self.isFloat(args[0])
 			if (not check):
 				return("Wrong value for %start. " + start)
@@ -222,9 +283,10 @@ class dat(netCommand):
 class utm(netCommand):
 
 	def __init__(self):
+
 		self.command = "uptime"
 		self.name = "Uptime"
-		self.args = ""
+		self.args = None
 		self.help = "Returns a summary of the boot time,\n"
 		self.help += "current time and the uptime of the system."
 
@@ -234,11 +296,11 @@ class utm(netCommand):
 	def uptime(self):
 		"""Returns the boottime and current uptime."""
 
-		reply = ("Boottime:\t" + str(datetime.fromtimestamp(float(gs.boottime)).strftime("%Y-%m-%d %H:%M:%S")) + "\n")
-		reply += ("Current time:\t" + str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + "\n")
+		reply = (self.getTabs("Boottime:") + str(datetime.fromtimestamp(float(gs.boottime)).strftime("%Y-%m-%d %H:%M:%S")) + "\n")
+		reply += (self.getTabs("Current time:") + str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + "\n")
 		diff = time.time() - gs.boottime
 		tDiff = gs.timediff(diff)
-		reply += ("Uptime:\t\t" + str(tDiff[0]) + "d, " + str(tDiff[1]) + ":" + str(tDiff[2]) + ":" + str(tDiff[3]))
+		reply += (self.getTabs("Uptime:") + "{}d, {}:{}:{}".format(tDiff[0], tDiff[1], tDiff[2], tDiff[3]))
 		return(reply)
 
 class hlp(netCommand):
@@ -267,18 +329,12 @@ class hlp(netCommand):
 			else:
 				return(str(arg) + "\tNo such command exists. Cannot give information.")
 
-	def getTabs(self, name):
-		if (len(name) < 8):
-			return(name + "\t\t")
-		else:
-			return(name + "\t")
-
 class thr(netCommand):
 
 	def __init__(self):
 		self.command = "threads"
 		self.name = "Threads"
-		self.args = ""
+		self.args = None
 		self.help = "Returns a list of the currently running threads of this software."
 		
 	def runCommand(self, args = None):
@@ -477,6 +533,7 @@ class spf(netCommand):
 class flt(netCommand):
 
 	def __init__(self):
+
 		self.command = "flt"
 		self.name = "Float switch"
 		self.args = ""

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.5.2	07-01-2018
+# v0.5.3	09-01-2018
 
 import logging
 import threading
@@ -85,7 +85,7 @@ class Group(object):
 			moist = gs.control.requestData(name = self.mstName)
 			if (gs.running and not gs.testmode):
 				try:
-					moist = int(moist)
+					moist = float(moist)
 				except:
 					return(moist)
 				if (moist <= self.lowtrig and gs.control.isPumpEnabled()):
@@ -163,7 +163,7 @@ class water(object):
 		self.group.watering = True
 		if (self.group.flowName is not None):
 			self.group.flowName.requestData(self)
-		start = time.time()
+		start = round(time.time(), 2)
 		t = 1
 		while (gs.adc.getMeasurement(self.group.groupname, 0) < self.group.hightrig):
 			gs.control.requestPumping(self.group.groupname, t)
@@ -175,7 +175,7 @@ class water(object):
 					break
 		gs.control.requestPumping(self.group.groupname, t)
 		self.group.watering = False
-		end = int(time.time() - start)
+		end = round(time.time(), 2)
 		self.group.flowName.endRqeuest(self)
 		msg = "{0}: Done watering on channel {1}, watered for {2} seconds.".format(time.strftime("%H:%M:%S"), self.group.chan, end)
 		if (self.group.flowName is not None):
@@ -183,30 +183,8 @@ class water(object):
 		print(msg)
 		logging.info(msg)
 		gs.db.wateringEvent(int(self.group.groupname[-1]), start, end, self.flow)
-#		self.storeEvent(str(self.group.chan), end)
 
 	def addPulse(self):
 		""""""
 
 		self.flow += 1
-		
-	'''
-	def storeEvent(self, plantname, length, water):
-		"""Add a watering event to the DB."""
-
-		with open(gs.wateringlist, "r", newline = "") as filestream:
-			file = csv.reader(filestream, delimiter = ",")
-			stuff = []
-			for line in file:
-				stuff.append(line)
-		while(True):
-			if (len(stuff) >= gs.waterlength):
-				del(stuff[0])
-			else:
-				break
-		stuff.append([channel, int(time.time()), length])
-		with open(gs.wateringlist, "w", newline = "") as filestream:
-			file = csv.writer(filestream, delimiter = ",")
-			for i in stuff:
-				file.writerow(i)
-	'''

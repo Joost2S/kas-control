@@ -80,7 +80,7 @@ class tdevManager(object):
 
 		with glob.glob("/sys/bus/w1/devices/28*") as devicelist:
 			if (devicelist == None):
-				logging.warning("No temp device found.")
+				logging.warning("No temp devices found.")
 				return(None)
 			for d in devicelist:
 				self.__devAddrs.append(d[-12:])

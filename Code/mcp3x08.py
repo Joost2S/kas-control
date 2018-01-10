@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.3.8	07-01-2018
+# v1.3.9	09-01-2018
 
 """
 For controlling MCP3208 and MCP3008 adc for light and moisture readings.
@@ -75,7 +75,8 @@ class adc(object):
 	def setSamples(self, samples):
 		"""Set how many individual reads you want to return for each measurement."""
 
-		self.__samples = samples
+		if (samples > 0):
+			self.__samples = samples
 
 
 	def setChannel(self, name, chan, p1 = None, p2 = None, gpio = None):
@@ -101,7 +102,7 @@ class adc(object):
 			logging.debug("Only one flip flop pin given, please give 2 pins for a complete flip-flop circuit.")
 			
 
-	def getMeasurement(self, name, rtype):
+	def getMeasurement(self, name, perc):
 		"""Get a reading of soil moisture level."""
 
 		level = 0.0
@@ -116,10 +117,9 @@ class adc(object):
 			if (self.__channels[name].ff):
 				gpo.output((self.__channels[name].p1, self.__channels[name].p2), False)
 		level /= self.__samples
-		if(rtype == 0):
-			return(round(level, 1))
-		elif(rtype == 1):
+		if(perc):
 			return(self.__convertToPrec(level, 1))
+		return(round(level, 1))
 
 
 	def setDebug(self, output):

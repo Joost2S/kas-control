@@ -15,7 +15,7 @@ cpu, cpu
 
 # flow
 # flowname, flowpin
-total, 14
+totalw, 14
 
 # pwr
 # name, addr, R
