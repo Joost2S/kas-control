@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.8	09-01-2018
+# v0.9.9	10-01-2018
 
 import csv
 from datetime import datetime, timedelta
@@ -479,14 +479,14 @@ class hwControl(object):
 
 	def getDBgroups(self):
 
-		data = []
+		data = {}
 		for n, g in self.__groups.items():
 			names = [g.mstName]
 			if (gs.hwOptions["soiltemp"] and g.tempName is not None):
 				names.append(g.tempName)
 			if (gs.hwOptions["flowsensors"] and g.flowName is not None):
 				names.append(g.flowName)
-			data.append([n, names])
+			data[n] = names
 		return(data)
 
 	def getADCres(self):

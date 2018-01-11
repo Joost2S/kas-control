@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.0.3	09-01-2018
+# v1.0.4	10-01-2018
 
 from abc import ABCMeta, abstractmethod
 import csv
@@ -248,6 +248,8 @@ class dat(netCommand):
 		names = None
 		if (args is not None):
 			try:
+				# If 2nd argument is convertable to float, it is assumed te be the end time
+				# and will be removed so checking for names can start at the same point in the array.
 				end = float(args[1])
 				del(args[1])
 			except:
@@ -255,28 +257,44 @@ class dat(netCommand):
 			if (len(args) > 1):
 				if (args[1][0] == "-"):
 					if (args[1][1] == "-"):
+						# 2 dashes: group selected
 						check, chan = self.channelCheck(args[0])
 						if (not check):
 							return(chan)
 						type = "group"
 						names = chan
 					else:
+						# 1 dash: types selected
 						type = "types"
+						names = []
+						names.append(args[1][1:])
 						if (len(args) > 2):
-							names = []
-							names.append(args[1][1:])
 							for a in args[2:]:
 								names.append(a)
-						else:
-							names = args[1][1:]
-				elif (isinstance(types, str)):
-					check, end = self.isFloat(args[1])
-					if (not check):
-						return("Wrong value for %end. " + end)
+				# No dashes: names selected
+				else:
+					type = "names"
+					names = args[1:]
 			check, start = self.isFloat(args[0])
 			if (not check):
 				return("Wrong value for %start. " + start)
-			return(gs.db.display_data(start,end))
+			data = None
+			if (type == "group"):
+				data = gs.db.getSensorData(start, end, group = names)
+			elif (type == "types"):
+				data = gs.db.getSensorData(start, end, types = names)
+			elif (type == "names"):
+				data = gs.db.getSensorData(start, end, names = names)
+			else:
+				data = gs.db.getSensorData(start, end)
+			if (data is None):
+				return("No data found.")
+			txt = ""
+			template = self.getTabs("{}") * len(data[0]) + "\n"
+			txt += template.format(*data[0])
+			for row in data[1:]:
+				txt += template.format(datetime.fromtimestamp(int(row[0])).strftime("%Y-%m-%d %H:%M:%S"), *row[:1])
+			return(txt)
 		else:
 			return("Please enter a start time.")
 
@@ -344,10 +362,10 @@ class thr(netCommand):
 		main_thread = threading.main_thread()
 		for t in gs.draadjes:
 			if (t.isAlive()):
-				tinfo += ("Thread" + str(t.threadID) + " name: " + str(t.getName()) + "\n")
+				tinfo += "Thread {} name: ()\n".format(t.threadID, t.getName())
 		for t in gs.wtrThreads:
 			if (t.isAlive()):
-				tinfo += ("Thread" + str(t.threadID) + " name: " + str(t.getName()) + "\n")
+				tinfo += "Thread {} name: {}\n".format(t.threadID, t.getName())
 		return(tinfo)
 
 class wtr(netCommand):
@@ -355,12 +373,13 @@ class wtr(netCommand):
 	def __init__(self):
 		self.command = "water"
 		self.name = "Waterlist"
-		self.args = "%channel%"
+		self.args = "%container%"
 		self.help = "Returns a list of the last times each channel has watered\n"
 		self.help += "and the time in between. Doesn't funtion correctly yet."
 
 	def runCommand(self, args = None):
-
+		# get plantname
+		# get last x entries for each plant
 		data = {}
 		results = ""
 		watered = False
@@ -887,6 +906,7 @@ class adp(netCommand):
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 
 class rmp(netCommand):
+	"""Disassociate plant from container by plantname or container number."""
 
 	def __init__(self):
 		self.command = "remplant"

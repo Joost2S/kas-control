@@ -33,6 +33,7 @@ class timedButton(object):
 	__metaclass__ = ABCMeta
 
 	def __init__(self, buttonpin):
+		pass
 
 class pumpToggle(object):
 	

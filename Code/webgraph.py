@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.7.1	15-08-2017
+# v0.7.2	10-01-2018
 
 """
 Make an HTML graph.
@@ -94,7 +94,7 @@ class webgraph(object):
 	
 	def print_graph_script(self):
 		# google chart snippet
-		chart_code="""
+		chart_code = """
 		<script type="text/javascript" src="https://www.google.com/jsapi"></script>
 		<script type="text/javascript">
 			google.load("visualization", "1", {packages:["corechart"]});
@@ -106,7 +106,6 @@ class webgraph(object):
 		print(self.selection)
 		for i in self.selection:
 			chart_code += ", '{}'".format(self.names[i])
-		print(self.selection)
 		chart_code += "],\n"
 		chart_code += self.formatTable()
 		chart_code += """

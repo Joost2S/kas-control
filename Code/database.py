@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.3	09-01-2018
+# v0.3.1	10-01-2018
 
 import calendar
 from datetime import datetime, timedelta
@@ -409,6 +409,18 @@ class Database(object):
 			return(False)
 		return(True)
 
+	def getWaterEvents(self, group = None, amount = 50):
+
+		# Get current plants
+		query  = "SELECT p.name FROM groups AS g "
+		query += "LEFT JOIN plants AS p ON g.plantID = p.plantID "
+		if (group is not None):
+			query += " WHERE g.groupID = {}".format(group)
+		query += "GROUP BY g.groupID "
+		data1 = self.__dbRead(query)
+		# Get the last watering events from the sensors
+		query  = "SELECT stuff"
+
 	def getTriggers(self, group):
 		
 		if (not (0 < group <= len(self.__groups))):
@@ -452,16 +464,14 @@ class Database(object):
 			en = "AND timestamp < {};".format(float(time.time()) - float(end)*60*60*24)
 		else:
 			en = ";"
-		sel = ""
+		sel = "timestamp"
 		if (names is not None):
 			if (isinstance(names, str)):
 				names = [names]
 			for n in names:
 				if (n in self.__fields.keys()):
-					sel += "{}, ".format()
-			if (len(sel) != 0):
-				sel = sel[:-2]
-			else:
+					sel += ", {}".format()
+			if (len(sel) == 0):
 				return(None)
 		elif (types is not None):
 			if (isinstance(types, str)):
@@ -469,16 +479,13 @@ class Database(object):
 			for t in types:
 				for fn, ft in self.__fields.items():
 					if (ft == t):
-						sel += "{}, ".format(fn)
-			if (len(sel) != 0):
-				sel = sel[:-2]
-			else:
+						sel += ", {}".format(fn)
+			if (len(sel) == 0):
 				return(None)
 		elif (group is not None):
 			if (group in self.__groups.keys()):
 				for name in self.__groups[group]:
-					sel += "{}, ".format(name)
-				sel = sel[:-2]
+					sel += ", {}".format(name)
 			else:
 				return(None)
 		else:
@@ -564,8 +571,8 @@ class Database(object):
 
 	def setInterval(self, interval):
 		"""Set a new interval in minutes."""
-
-		self.__interval = float(interval)
+		if (interval >= 1.0):
+			self.__interval = float(interval)
 	
 	def getContainerNameTriggers(self, container):
 		"""Returns [plantname, lowtrig, hightrig]"""

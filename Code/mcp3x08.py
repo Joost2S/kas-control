@@ -9,14 +9,6 @@ FF (flip-flop) support is available per channel for when you have a flip-flop se
 Select a gpio chip (raspberry pi GPIO, mcp23017, etc) as main controller for flip-flop pins.
 Alternate GPIO's can be set for each channel.
 """
-"""
-9-6: Updated to force users to assign a name to each sensor and 
-use that name to get the measurement.
-14-6: Made a channel object because the variables per channel
-were getting too many to easily manage as tuple.
-15-6: Made getMeasurement shorter.
-20-7:	Introduced threading.lock() per channel.
-"""
 
 from abc import ABCMeta, abstractmethod
 import logging
