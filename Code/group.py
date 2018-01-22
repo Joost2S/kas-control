@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.5.3	09-01-2018
+# v0.5.4	12-01-2018
 
 import logging
 import threading
@@ -100,15 +100,19 @@ class Group(object):
 	def getT(self):
 		"""Returns the temperature of the associated sensor."""
 
-		if (self.tempName is None):
+		if (self.tempName is None or not self.enabled ):
 			return(None)
+		if (not self.connected):
+			return("N/C")
 		return(gs.control.requestData(name = self.tempName))
 
 	def getF(self):
 		"""Returns the flowrate of the associated sensor if available."""
 
-		if (self.flowName is None):
+		if (self.flowName is None or not self.enabled ):
 			return(None)
+		if (not self.connected):
+			return("N/C")
 		return(self.flowName.getFlowRate())
 
 	def setTriggers(self, lt = None, ht = None):

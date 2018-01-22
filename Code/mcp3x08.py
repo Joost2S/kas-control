@@ -8,6 +8,7 @@ For controlling MCP3208 and MCP3008 adc for light and moisture readings.
 FF (flip-flop) support is available per channel for when you have a flip-flop setup to prevent electrolysis.
 Select a gpio chip (raspberry pi GPIO, mcp23017, etc) as main controller for flip-flop pins.
 Alternate GPIO's can be set for each channel.
+For details, see datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/21298c.pdf
 """
 
 from abc import ABCMeta, abstractmethod

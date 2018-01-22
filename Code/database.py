@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.3.1	10-01-2018
+# v0.3.2	12-01-2018
 
 import calendar
 from datetime import datetime, timedelta
@@ -152,7 +152,7 @@ class Database(object):
 
 		validated = False
 		fields = gs.control.getDBfields()
-
+		# Maybe implement an integrity check sometime so this check can actually complete succesfully.
 		if (validated):
 			gs.control.setPlantsAndTriggers()
 		else:
@@ -396,6 +396,9 @@ class Database(object):
 		self.__dbWrite(dbmsg2, dbmsg3)
 
 	def wateringEvent(self, group, start, end, amount):
+		"""
+		Use this method to add a watering event to the DB.
+		"""
 
 		if (not (0 < group <= len(self.__groups))):
 			logging.info("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
@@ -409,17 +412,37 @@ class Database(object):
 			return(False)
 		return(True)
 
-	def getWaterEvents(self, group = None, amount = 50):
+	def getWaterEvents(self, group = None, amount = 20):
+		"""
+		Get the last watering events from 1 or all currently active container.
+		amount is the records per container.
+		Returns 2 lists of equal length:
+		list 1: [[groupID, plantname],]
+		list 2: [None, or [[starttime, time, water],],]
+		"""
 
 		# Get current plants
-		query  = "SELECT p.name FROM groups AS g "
+		query  = "SELECT g.groupName, p.name FROM groups AS g "
 		query += "LEFT JOIN plants AS p ON g.plantID = p.plantID "
 		if (group is not None):
-			query += " WHERE g.groupID = {}".format(group)
-		query += "GROUP BY g.groupID "
+			query += "WHERE g.groupName = '{}' ".format(group)
+		query += "GROUP BY g.groupID;"
 		data1 = self.__dbRead(query)
+		if (data1 is None):
+			return(None, None)
+		data2 = []
 		# Get the last watering events from the sensors
-		query  = "SELECT stuff"
+		for row in data1:
+			group = row[0]
+			query  = "SELECT w.starttime, w.endtime - w.starttime AS time, w.amount "
+			query += "FROM watering AS w "
+			query += "INNER JOIN groups AS g on w.plantID = g.plantID "
+			query += "INNER JOIN plants AS p ON g.plantID = p.plantID "
+			query += "WHERE g.groupName = '{}'" .format(group)
+			query += "ORDER BY w.starttime ASC "
+			query += "LIMIT {};".format(amount)
+			data2.append(self.__dbRead(query))
+		return(data1, data2)
 
 	def getTriggers(self, group):
 		
@@ -457,7 +480,7 @@ class Database(object):
 		data = self.__dbWrite(query)
 
 	def getSensorData(self, start, end = 0.0, names = None, types = None, group = None):
-		"""Returns a 2D array with the sensor data. First row contains the names."""
+		"""Returns a 2D array with the sensor data. First row contains the sensor names."""
 		
 		st = float(time.time()) - float(start)*60*60*24
 		if (end > 0):
@@ -582,7 +605,9 @@ class Database(object):
 		query += "INNER JOIN plants as p ON g.plantID = p.plantID "
 		query += "WHERE g.groupName = '{}';".format(container)
 		data = self.__dbRead(query)
-		return(data)# return(data[0])?
+		if (data is None):
+			return(data)
+		return(data[0])
 
 	def datalog(self):
 		"""This is the main datalogging method. Every %interval minutes the data will be recorded into the database."""

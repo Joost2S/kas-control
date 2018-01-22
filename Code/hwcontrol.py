@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.9	10-01-2018
+# v0.9.10	12-01-2018
 
 import csv
 from datetime import datetime, timedelta
@@ -191,7 +191,7 @@ class hwControl(object):
 
 	def setTriggers(self, group, low = None, high = None):
 
-		#Getting a pow(10) value instead of a pow(2):
+		#Getting a base 10 value instead of a base 2 value:
 		upperthreshold = self.getADCres() - (self.getADCres() % 1000)
 		if (self.__groups[group].plantName is None):
 			return("Container {} has no plant assigned. Cannot change trigger values.".format(group))
@@ -478,6 +478,7 @@ class hwControl(object):
 		return(self.__pump.enabled)
 
 	def getDBgroups(self):
+		"""The DB uses this to make a new db or check integrity on startup."""
 
 		data = {}
 		for n, g in self.__groups.items():
@@ -510,3 +511,8 @@ class hwControl(object):
 	def __getSpoofData(self, type = None, name = None, caller = None):
 
 		return("Stuff.")
+
+	def shutdown(self):
+
+		self.__statusLED.off()
+		self.__pump.disable() #Shuts down the valves as well.

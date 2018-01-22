@@ -1,11 +1,10 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.8.14	07-01-2018
+# v0.8.15	12-01-2018
 
 
 from abc import ABCMeta, abstractmethod
-import csv
 import datetime
 import logging
 import os
@@ -422,6 +421,26 @@ class valve(object):
 			self.open = False
 	
 
+class fan(object):
+
+	__mcp = None
+	__pin = ""
+	__state = False
+
+	def __init(self, pin):
+		
+		if (globstuff.getPinDev(pin).setPin(globstuff.getPinNr(pin))):
+			self.__mcp = globstuff.getPinDev(pin)
+			self.__pin = globstuff.getPinNr(pin)
+
+
+	def on(self):
+		pass
+
+	def off(self):
+		pass
+
+
 class globstuff:
 
 	hwOptions = {"lcd" : True,
@@ -570,7 +589,7 @@ class globstuff:
 		for mcp in globstuff.mcplist:
 			mcp.allOff()
 		globstuff.server.sslSock.close()
-		globstuff.sLED.off()
+		globstuff.control.shutdown()
 		GPIO.cleanup()
 		print("Cleanup done.")
 		if (globstuff.shutdownOpt == "-r" or globstuff.shutdownOpt == "-x"):

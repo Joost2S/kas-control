@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.0.4	10-01-2018
+# v1.0.5	12-01-2018
 
 from abc import ABCMeta, abstractmethod
 import csv
@@ -71,6 +71,7 @@ class netCommand(object):
 	def getTabs(self, txt, tabs = 2, tablength = 8):
 		"""Returns a tring of a fixed length for easier formatting of tables. Assuming your console has a tab length of 8 chars."""
 
+		txt = str(txt)
 		size = tabs * tablength
 		if (len(txt) > size):
 			return(txt[:size])
@@ -179,7 +180,7 @@ class mst(netCommand):
 	def __init__(self):
 		self.command = "mst"
 		self.name = "Moisture level"
-		self.args = "%groupnumber"
+		self.args = "%group"
 		self.help = []
 		self.help.append("Takes a measurement of the given sensor and returns the soilmoisture level.\n")
 		self.help.append("Available sensors:\n")
@@ -246,57 +247,56 @@ class dat(netCommand):
 		end = 0.0
 		type = None
 		names = None
-		if (args is not None):
-			try:
-				# If 2nd argument is convertable to float, it is assumed te be the end time
-				# and will be removed so checking for names can start at the same point in the array.
-				end = float(args[1])
-				del(args[1])
-			except:
-				pass
-			if (len(args) > 1):
-				if (args[1][0] == "-"):
-					if (args[1][1] == "-"):
-						# 2 dashes: group selected
-						check, chan = self.channelCheck(args[0])
-						if (not check):
-							return(chan)
-						type = "group"
-						names = chan
-					else:
-						# 1 dash: types selected
-						type = "types"
-						names = []
-						names.append(args[1][1:])
-						if (len(args) > 2):
-							for a in args[2:]:
-								names.append(a)
-				# No dashes: names selected
-				else:
-					type = "names"
-					names = args[1:]
-			check, start = self.isFloat(args[0])
-			if (not check):
-				return("Wrong value for %start. " + start)
-			data = None
-			if (type == "group"):
-				data = gs.db.getSensorData(start, end, group = names)
-			elif (type == "types"):
-				data = gs.db.getSensorData(start, end, types = names)
-			elif (type == "names"):
-				data = gs.db.getSensorData(start, end, names = names)
-			else:
-				data = gs.db.getSensorData(start, end)
-			if (data is None):
-				return("No data found.")
-			txt = ""
-			template = self.getTabs("{}") * len(data[0]) + "\n"
-			txt += template.format(*data[0])
-			for row in data[1:]:
-				txt += template.format(datetime.fromtimestamp(int(row[0])).strftime("%Y-%m-%d %H:%M:%S"), *row[:1])
-			return(txt)
-		else:
+		if (args is None):
 			return("Please enter a start time.")
+		try:
+			# If 2nd argument is convertable to float, it is assumed te be the end time
+			# and will be removed so checking for names can start at the same point in the array.
+			end = float(args[1])
+			del(args[1])
+		except:
+			pass
+		if (len(args) > 1):
+			if (args[1][0] == "-"):
+				if (args[1][1] == "-"):
+					# 2 dashes: group selected
+					check, chan = self.channelCheck(args[0])
+					if (not check):
+						return(chan)
+					type = "group"
+					names = chan
+				else:
+					# 1 dash: types selected
+					type = "types"
+					names = []
+					names.append(args[1][1:])
+					if (len(args) > 2):
+						for a in args[2:]:
+							names.append(a)
+			# No dashes: names selected
+			else:
+				type = "names"
+				names = args[1:]
+		check, start = self.isFloat(args[0])
+		if (not check):
+			return("Wrong value for %start. " + start)
+		data = None
+		if (type == "group"):
+			data = gs.db.getSensorData(start, end, group = names)
+		elif (type == "types"):
+			data = gs.db.getSensorData(start, end, types = names)
+		elif (type == "names"):
+			data = gs.db.getSensorData(start, end, names = names)
+		else:
+			data = gs.db.getSensorData(start, end)
+		if (data is None):
+			return("No data found.")
+		txt = ""
+		template = self.getTabs("{}") * len(data[0]) + "\n"
+		txt += template.format(*data[0])
+		for row in data[1:]:
+			txt += template.format(datetime.fromtimestamp(int(row[0])).strftime("%Y-%m-%d %H:%M:%S"), *row[:1])
+		return(txt)
 
 class utm(netCommand):
 
@@ -314,11 +314,11 @@ class utm(netCommand):
 	def uptime(self):
 		"""Returns the boottime and current uptime."""
 
-		reply = (self.getTabs("Boottime:") + str(datetime.fromtimestamp(float(gs.boottime)).strftime("%Y-%m-%d %H:%M:%S")) + "\n")
-		reply += (self.getTabs("Current time:") + str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) + "\n")
+		reply  = self.getTabs("Boottime:", 3) + "{}\n".format(datetime.fromtimestamp(float(gs.boottime)).strftime("%Y-%m-%d %H:%M:%S"))
+		reply += self.getTabs("Current time:", 3) + "{}\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 		diff = time.time() - gs.boottime
 		tDiff = gs.timediff(diff)
-		reply += (self.getTabs("Uptime:") + "{}d, {}:{}:{}".format(tDiff[0], tDiff[1], tDiff[2], tDiff[3]))
+		reply += self.getTabs("Uptime:", 3) + "{}d, {}:{}:{}".format(*tDiff)
 		return(reply)
 
 class hlp(netCommand):
@@ -373,45 +373,60 @@ class wtr(netCommand):
 	def __init__(self):
 		self.command = "water"
 		self.name = "Waterlist"
-		self.args = "%container%"
+		self.args = "%container%, %entries%"
 		self.help = "Returns a list of the last times each channel has watered\n"
-		self.help += "and the time in between. Doesn't funtion correctly yet."
+		self.help += "and the time in between.\n"
+		self.help += "container:\tNumber of the container you want to check.\n"
+		self.help += "entries:\tHow many events to display per container. Default is 20."
 
 	def runCommand(self, args = None):
+
 		# get plantname
 		# get last x entries for each plant
-		data = {}
-		results = ""
-		watered = False
-
-		# Sorting data per group
-		for i in range(len(gs.ch_list)):
-			data[i] = []
-		with open(gs.wateringlist, "r", newline = "") as filestream:
-			file = csv.reader(filestream, delimiter = ",")
-			for line in file:
-				data[int(line[0])].append(line)
-
-		for g in gs.ch_list:
-			results += "Channel {0} ({1}):\n".format(g.chan + 1, len(data[g.chan]))
-			if (len(data[g.chan]) == 0):
-				results += "\tNothing yet.\n"
+		data1 = None
+		data2 = None
+		txt = ""
+		amount = None
+		
+		# Extract and validate user input:
+		if (args is not None):
+			if (len(args) > 0):
+				check, chan = self.channelCheck(args[0])
+				if (not check):
+					return(chan)
+				if (len(args) > 1):
+					try:
+						if (int(args[1]) >= 1):
+							amount = int(args[1])
+						else:
+							raise Exception
+					except:
+						return("Invalid amount.")
+			# Collect and validate requested data:
+				data1, data2 = gs.db.getWaterEvents(group, water)
+				if (data1 is None):
+					return("No plant assigned to container {}.".format(chan))
 			else:
-				for i in range(len(data[g.chan])):
-					if (i > 0):
-						zeit = gs.timediff(int(data[g.chan][i][1]) - int(data[g.chan][i - 1][1]))
-						results += ("\t\tTime since previous watering: {0}d, {1}:{2}:{3}\n".format(str(zeit[0]), str(zeit[1]), str(zeit[2]), str(zeit[3])))
-					results += ("\t{0} - Watered for {1} seconds.\n".format(str(datetime.fromtimestamp(int(data[g.chan][i][1])).strftime("%Y-%m-%d %H:%M:%S")), str(data[g.chan][i][2])))
-				zeit = gs.timediff(time.time() - int(data[g.chan][-1][1]))
-				results += ("\t\tTime since last watering: {0}d, {1}:{2}:{3}\n".format(str(zeit[0]), str(zeit[1]), str(zeit[2]), str(zeit[3])))
-				watered = True
-				
-		if (not watered):
-			results = "System hasn't watered yet.\n"
-		for g in gs.ch_list:
-			if (g.watering):
-				results += "\nSystem is currently watering on channel {0}.".format(str(g.chan + 1))
-		return(results)
+				data1, data2 = gs.db.getWaterEvents()
+				if (data1 is None):
+					return("No plants currently assigned.")
+
+		# Process data:
+		for i, plant in enumerate(data1):
+			if (data2[i] is not None):
+				txt += "\nLast {} watering events for plant {}:\n".format(len(data2[i]), plant[1])
+				for j, row in reversed(data2[i]):
+					if (j > 0):
+						zeit = gs.timediff(int(row[0]) - int(data2[j - 1][0]))
+						results += "\t\tTime since previous watering: {0}d, {1}:{2}:{3}\n".format(*zeit)
+					txt += "\tTime\t\t|Duration\t|Amount\n"
+					txt += "\t{}|{}|{}\n".format(self.getTabs(datetime.fromtimestamp(int(row[0])).strftime("%Y-%m-%d %H:%M:%S")),
+							 self.getTabs(round(row[1], 1)), self.getTabs(row[2]))
+				zeit = gs.timediff(time.time() - int(data2[-1][0]))
+				txt += "\t\tTime since last watering: {0}d, {1}:{2}:{3}\n".format(*zeit)
+			else:
+				txt += "\nPlant {} has not been watered yet.\n".format(plant[0])
+		return(txt)
 
 class vts(netCommand):
 
