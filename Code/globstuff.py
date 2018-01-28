@@ -143,8 +143,8 @@ class floatUp(object):
 				if (not (time.time() - self.lastMailSent) < 10800):
 					#	Send an email to alert user.
 					self.lastMailSent = time.time()
-					fromaddr = "kas.mam.control@gmail.com"
-					toaddr  = "tinakoster@hotmail.com"
+					fromaddr = ""
+					toaddr  = ""
 					subject = "Laag water"
 					text = "Er is te weinig water in de regenton. Automatische bewatering is gestopt tot de regenton verder is gevuld"
 					date = datetime.datetime.now().strftime( "%d/%m/%Y %H:%M" )
@@ -152,7 +152,7 @@ class floatUp(object):
 
 					# Credentials
 					username = fromaddr
-					password = "halloblaatdingesblahmoi"
+					password = ""
 
 					# The actual mail send
 					server = smtplib.SMTP("smtp.gmail.com:587")

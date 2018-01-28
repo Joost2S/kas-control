@@ -22,10 +22,10 @@ class shutdownError(Exception):
 class kasControlClient(object):
 	
 	host = "kas-control"
-	ipList = [("217.120.75.46", "Login remote."),
-				("217.123.221.17", "Login from remote location."),
-				("192.168.1.225", "Login from home."),
-				("192.168.1.157", "Login from test location.")
+	ipList = [("", "Login remote."),
+				("", "Login from remote location."),
+				("", "Login from home."),
+				("", "Login from test location.")
 				]
 	ipAddr = ""
 	port = 7500

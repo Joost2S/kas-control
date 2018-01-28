@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.0.1	04-01-2018
+# v0.0.2	27-01-2018
 
 # For details, see datasheet: http://www.ti.com/lit/ds/symlink/ina219.pdf
 
@@ -12,6 +12,7 @@ import smbus
 class ina219(object):
 
 	__addr = 0
+	__bus = None
 	__engaged = False
 	__regMap = {
 		  "config":	0x00,	
@@ -25,14 +26,20 @@ class ina219(object):
 	def __init__(self, addr):
 		
 		self.__addr = addr
+		self.__bus = smbus.SMBus(1)
 
 
 	def engage(self):
 
 		if (not self.__engaged):
-			pass
+			conVal = 0
+			calVal = 0
+			self.bus.write_byte_data(self.devAddr, self.regMap["config"], conVal)
+			self.bus.write_byte_data(self.devAddr, self.regMap["calibration"], calVal)
+		else:
+			logging.debug("INA219 device on " + hex(self.devAddr) + " is already enabled.")
 
-	def settings(self, setting):
+	def setup(self, setting):
 
 		if (not self.__engaged):
 			pass
@@ -42,14 +49,23 @@ class ina219(object):
 	def getCurrent(self):
 
 		if (self.__engaged):
+			current = int(self.bus.read_byte_data(self.devAddr, self.regMap["current"]))
 			return(current)
 
 	def getVolage(self):
 
 		if (self.__engaged):
+			voltage = int(self.bus.read_byte_data(self.devAddr, self.regMap["busV"]))
 			return(voltage)
+
+	def getShuntVoltage(self):
+
+		if (self.__engaged):
+			shuntVoltage = int(self.bus.read_byte_data(self.devAddr, self.regMap["shuntV"]))
+			return(shuntVoltage)
 
 	def getPower(self):
 
 		if (self.__engaged):
+			power = int(self.bus.read_byte_data(self.devAddr, self.regMap["power"]))
 			return(power)

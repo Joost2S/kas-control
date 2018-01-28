@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.9	01-21-2017
+# v0.9.10	01-27-2017
 
 """
 This is a python driver for an i2c MCP23017. python-smbus must be installed for this driver to work.
@@ -249,14 +249,14 @@ class mcp230xx(object):
 		for pin in self.GPA:
 			if (pin.intCon):
 				intCon += pin.value
-		self.bus.write_byte_data(self.devAddr, self.regMap["INTCONA"], intCon)
+		self.bus.write_byte_data(self.devAddr, self.regMap["INTCON" + bankChar], intCon)
 		
 		# GPI PULLUP resistor setup
 		GPPU = 0x00
 		for pin in self.GPA:
 			if (pin.pullUp):
 				GPPU += pin.value
-		self.bus.write_byte_data(self.devAddr, self.regMap["GPPUA"], GPPU)
+		self.bus.write_byte_data(self.devAddr, self.regMap["GPPU" + bankChar], GPPU)
 		
 		# General configuration
 		s = 2
@@ -282,7 +282,7 @@ class mcp230xx(object):
 				self.hasBinput = True
 			bank[pin].setDir(direction)
 		else:
-			logging.debug("MCP23017 on {} is already enabled. Can't change pin {} anymore.".format(hex(self.devAddr), pin))
+			logging.debug("MCP23017 device on {} is already enabled. Can't change pin {} anymore.".format(hex(self.devAddr), pin))
 
 	def setSetup(self, reg, val):
 		"""Call this method to change a setting in IOCON. See datasheet for details."""
@@ -299,28 +299,30 @@ class mcp230xx(object):
 		"""Call this method to change one or more output pins to low (state = False) or high (state = True)."""
 
 		if (self.enabled):
-			hasA = False
-			hasB = False
+			AbankChanged = False
+			BbankChanged = False
 			if (not self.__typeCheck(pins)):
 				pins = (pins, )
 			for p in pins:
 				try:
 					bank, pin = self.__checkPinInput(p)
 				except PinValueError:
-					logging.debug("Invalid pin. " + str(p))
+					logging.debug("Output requested on invalid pin {}:{}".format(hex(self.devAddr), pin))
 					continue
 				if (bank == self.GPA):
-					hasA = True
+					AbankChanged = True
 				else:
-					hasB = True
+					BbankChanged = True
+					# Changing state in driver software only.
 				bank[pin].setState(state)
-			if (hasA):
+			# Changing the pins in the GPIO device. Need to be set per bank (NCP23017).
+			if (AbankChanged):
 				OLATa = 0x00
 				for p in self.GPA:
 					if (p.state):
 						OLATa += p.value
 				self.bus.write_byte_data(self.devAddr, self.regMap["OLATA"], OLATa)
-			if (hasB):
+			if (BbankChanged):
 				OLATb = 0x00
 				for p in self.GPB:
 					if (p.state):
@@ -374,22 +376,21 @@ class mcp230xx(object):
 			bank, pin = self.__checkPinInput(pin)
 			return(bank[pin].showStatus())
 		except PinValueError:
-			logging.debug("Stats requested for invalid pin: " + str(pin))
+			logging.debug("Stats requested for invalid pin {}:{}".format(hex(self.devAddr), pin))
 		
 	def getPinState(self, pin):
 		"""Call this method to see if a pin is high or low."""
-
-		bank = 0
-		checkedPin = self.checkPinInput(pin)
-		if (checkedPin is not False):
-			if (checkedPin[0] == "A"):
-				bank = int(self.bus.read_byte_data(self.devAddr, self.regMap["GPIOA"]))
-				if (not (self.GPA[checkedPin[1]].value & bank) == 0):
-					return(True)
-			elif (checkedPin[0] == "B"):
-				bank = int(self.bus.read_byte_data(self.devAddr, self.regMap["GPIOB"]))
-				if (not (self.GPB[checkedPin[1]].value & bank) == 0):
-					return(True)
+		
+		try:
+			bank, pin = self.__checkPinInput(pin)
+		except PinValueError:
+			logging.debug("State requested for invalid pin {}:{}".format(hex(self.devAddr), pin))
+		register = "GPIOB"
+		if (bank == self.GPA):
+			register = "GPIOA"
+		bankValue = int(self.bus.read_byte_data(self.devAddr, self.regMap[register]))
+		if (not (self.GPA[checkedPin[1]].value & bankValue) == 0):
+			return(True)
 		return(False)
 
 	def addInterruptInput(self, pin, obj, trig):
@@ -489,7 +490,7 @@ class mcp23008(mcp230xx):
 				msg += "\tInt pin: " + str(self.intPin)
 			print(msg)
 		else:
-			logging.debug("MCP23017 on " + hex(self.devAddr) + " is already enabled. Can't change it anymore.")
+			logging.debug("MCP23017 device on " + hex(self.devAddr) + " is already enabled. Can't change it anymore.")
 	
 	def __checkPinInput(self, input):
 		"""
@@ -653,7 +654,7 @@ class mcp23017(mcp230xx):
 						logging.info("Interrupt triggered: " + p.name)
 						return(p.name)
 			logging.debug("No pin found on interrupt at addr: " + hex(self.devAddr) + " :(")
-			return(None)
+		return(None)
 
 	
 class PinValueError(Exception):
