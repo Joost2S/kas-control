@@ -18,9 +18,9 @@ cpu, cpu
 totalw, 14
 
 # pwr
-# name, addr, R
-5v, 0x40, 0.04
-12v, 0x45, 0.04
+# name,	addr, V,		
+5v,		0x40, 5,		
+12v,		0x45, 12,	
 #
 # group
 # vpin, ff1, ff2, adcChan, flowpin, temploc

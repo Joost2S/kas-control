@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.7.6	09-01-2018
+# v0.7.7	27-01-2018
 
 import logging
 import RPi.GPIO as GPIO
@@ -9,13 +9,11 @@ import threading
 import time
 
 import database
-import globstuff
+from globstuff import globstuff as gs
 import hwcontrol
 import network
 import pushbutton
 import webgraph
-
-gs = globstuff.globstuff
 
 class Datalog(globstuff.protoThread):
 	def run(self):

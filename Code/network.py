@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.0.5	12-01-2018
+# v1.0.06	29-01-2018
 
 from abc import ABCMeta, abstractmethod
 import csv
@@ -12,9 +12,7 @@ import ssl
 import threading
 import time
 
-import globstuff
-
-gs = globstuff.globstuff
+from globstuff import globstuff as gs
 
 class netCommand(object):
 	"""Base object for commands available through the network interface."""
@@ -889,7 +887,7 @@ class log(netCommand):
 class adp(netCommand):
 	"""
 	The name and type of the plant are seperated by a comma to enable users to
-	enter multi-word plant names en species.
+	enter multi-word plant names and species.
 	"""
 
 	def __init__(self):
@@ -930,7 +928,13 @@ class rmp(netCommand):
 		self.help = ""
 
 	def runCommand(self, args = None):
-		pass
+		if (args is not None):
+			check, chan = self.channelCheck(args[0])
+			if (not check):
+				return(chan)
+			group = gs.control.getGroupName(chan)
+			return(gs.db.removePlant(group))
+		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 
 class Server(object):
 	

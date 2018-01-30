@@ -24,8 +24,8 @@
 		
 	- init of database
 		- if file doesn't exist yet get fields info from gs.control and create DB 
-		- else get fields info from gs.control and from db and check if data match -->
-			- if data match, set the plantnames and then trigger levels of groups as recorded in the db
+		- else get fields info from gs.control and from db and check if datasets match -->
+			- if datasets match, set the plantnames and then trigger levels of groups as recorded in the db
 		- set gs.db to reference to database instance
 	
 	- init of webgraph module -->

@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.10	12-01-2018
+# v0.9.11	29-01-2018
 
 import csv
 from datetime import datetime, timedelta
@@ -286,7 +286,7 @@ class hwControl(object):
 							elif (curType == "flow" and gs.hwOptions["flowsensors"]):
 								self.__flowSensors["flow-g" + i] = flowsensor.flowMeter(output[1])
 							elif (curType == "pwr" and gs.hwOptions["powermonitor"]):
-								self.__ina[output[0]] = ina219.ina219(output[1])
+								self.__ina[output[0]] = ina219.ina219(output[1], output[2])
 								self.__sensors[output[0]] = curType
 							self.__otherSensors.append(output[0])
 				
@@ -462,10 +462,10 @@ class hwControl(object):
 		of ds18b20 sensors in seconds, with a minimum of 5 seconds.
 		"""
 		
-		tempsensors = float(len(self.__tempMGR.getTdevList()))
+		tempsensors = len(self.__tempMGR.getTdevList())
 		if (time == None):
 			if (tempsensors < 5):
-				self.__timeRes = 5.0
+				self.__timeRes = 5
 			else:
 				self.__timeRes = tempsensors
 		else:

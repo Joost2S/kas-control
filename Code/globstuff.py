@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.8.15	12-01-2018
+# v0.8.16	27-01-2018
 
 
 from abc import ABCMeta, abstractmethod
@@ -492,11 +492,13 @@ class globstuff:
 	shutdownOpt = None				# Set shutdown mode.
 
 	# Initiate MCP23017 GPIO expanders:
-	mcplist = (mcp23017.mcp23017(0x21),				# u2
+	mcplist = [mcp23017.mcp23017(0x21),				# u2
 				mcp23017.mcp23017(0x20, intPintU4),	# u4
 				mcp23017.mcp23017(0x23, intPinU5),	# u5
 				mcp23017.mcp23017(0x27)					# u6
-				)
+				]
+	if (hwOptions["powermonitor"]):
+		mcplist.append(mcp23017.mcp23008(0x22))	# u12
 
 	# Major modules:
 	control = None						# Reference to the hwcontrol instance.
