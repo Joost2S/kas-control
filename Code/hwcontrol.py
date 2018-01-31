@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.11	29-01-2018
+# v0.9.12	30-01-2018
 
 import csv
 from datetime import datetime, timedelta
@@ -225,9 +225,15 @@ class hwControl(object):
 			return(self.__groups[group].lowtrig, self.__groups[group].hightrig)
 		return(None, None)
 
-	def addPlant(self, group, name, type = None):
+	def addPlant(self, group, name, species = None):
 
-		pass
+		if (group in self.__groups):
+			if (self.__groups[group].getName() == group):
+				if(gs.db.addplant(name, group, species)):
+					return("Added plant {} to container {}.".format(name.title(), group[-1]))
+				return("Error trying to add plant. Check log for details.")
+			return("Can't add new plant. Plant {} is already assigned to container {}.".format(self.__groups[group].getName(), group[-1]))
+		return("Invalid group.")
 
 	def getGroupName(self, group):
 

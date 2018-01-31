@@ -909,7 +909,7 @@ class adp(netCommand):
 				txt = ""
 				for arg in args[1:]:
 					txt += str(arg) + " "
-				if (txt.find(",",) is not -1):
+				if (txt.find(",",) != -1):
 					list = txt.split(",", 1)
 					name = list[0]
 					type = list[1]

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.3.2	12-01-2018
+# v0.3.3	30-01-2018
 
 import calendar
 from datetime import datetime, timedelta
@@ -312,8 +312,8 @@ class Database(object):
 			group = group[-1]
 		if (not (0 < group <= len(self.__groups))):
 			self.lastResult = False
-			print("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
-			return
+			logging.error("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
+			return(False)
 		# Get species ID for given species.
 		dbmsg1 = "SELECT typeID FROM plantTypes WHERE species = '{}';".format(species)
 		# Get info on requested container.
@@ -331,17 +331,18 @@ class Database(object):
 		# Abort if there is already a plant in the requested container
 		if (curPlant is not None):
 			self.lastResult = False
-			self.__printutf("Plant '{}' is already assigned to container {}.".format(curPlant[0], group)) # logging.debug
-			return
+			logging.error("Plant '{}' is already assigned to container {}.".format(curPlant[0], group))
+			return(False)
 		# If species isn't in the DB yet, add entry
 		if (sID is None):
-			self.__printutf("New species. Adding {} to DB...".format(species))	# logging.info
+			logging.info("New species. Adding {} to DB...".format(species))
 			self.__addSpecies(species)
 		dbmsg3 = "INSERT INTO plants(name, plantType, datePlanted, groupID) "
 		dbmsg3 += "VALUES('{}', ({}), datetime(), {});".format(name, dbmsg1[:-1], group)
 		dbmsg4 = "UPDATE groups SET plantID = (SELECT max(plantID) FROM plants) WHERE groupID = {};".format(group)
 		self.__dbWrite(dbmsg3, dbmsg4)
 		self.lastResult = True
+		return(True)
 		
 	def __addSpecies(self, species):
 

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.1.00	29-01-2018
+# v0.1.01	30-01-2018
 
 # For details, see datasheet: http://www.ti.com/lit/ds/symlink/ina219.pdf
 
@@ -75,7 +75,7 @@ class ina219(object):
 			self.__configVal += SADC * (2 ** 3)
 			self.__configVal += mode
 		else:
-			logging.debug("INA219 device on " + hex(self.devAddr) + " is already enabled.")
+			logging.debug("INA219 device on addr " + hex(self.devAddr) + " is already enabled.")
 
 	def setCalibration(self, maxCurrent, rShunt):
 		
@@ -85,16 +85,16 @@ class ina219(object):
 			if (cal < (2 ** 16)):
 				self.__calibVal = cal
 		else:
-			logging.debug("INA219 device on " + hex(self.devAddr) + " is already enabled.")
+			logging.debug("INA219 device on addr " + hex(self.devAddr) + " is already enabled.")
 
 	def engage(self):
 
 		if (not self.__engaged):
-			calVal = 0
-			self.bus.write_byte_data(self.devAddr, self.regMap["config"], conVal)
-			self.bus.write_byte_data(self.devAddr, self.regMap["calibration"], calVal)
+			self.bus.write_byte_data(self.devAddr, self.regMap["config"], self.__configVal)
+			self.bus.write_byte_data(self.devAddr, self.regMap["calibration"], self.__calibVal)
+			self.__engaged = True
 		else:
-			logging.debug("INA219 device on " + hex(self.devAddr) + " is already enabled.")
+			logging.debug("INA219 device on addr " + hex(self.devAddr) + " is already enabled.")
 
 	def getCurrent(self):
 
