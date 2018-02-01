@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.3.3	30-01-2018
+# v0.3.4	31-01-2018
 
 import calendar
 from datetime import datetime, timedelta
@@ -17,28 +17,6 @@ import time
 import globstuff
 gs = globstuff.globstuff
 
-
-class Reprinter:
-	"""\t\tClass copied/pasted from:
-		https://stackoverflow.com/a/15586020"""
-
-	def __init__(self):
-		self.text = ''
-
-	def moveup(self, lines):
-		for _ in range(lines):
-			sys.stdout.write("\x1b[A")
-
-	def reprint(self, text):
-		# Clear previous text by overwritig non-spaces with spaces
-		self.moveup(self.text.count("\n"))
-		sys.stdout.write(re.sub(r"[^\s]", " ", self.text))
-
-		# Print new text
-		lines = min(self.text.count("\n"), text.count("\n"))
-		self.moveup(lines)
-		sys.stdout.buffer.write(text.encode("utf-8"))
-		self.text = text
 	
 class Database(object):
 	
@@ -74,14 +52,10 @@ class Database(object):
 	__interval = 5.0						# Record sensor data every x min
 	pause = False
 
-	count = 0
-	a = 0
-	b = 0.88
 
 	lastPlant = ""
 	lastAction = ""
 	lastResult = False
-	repr = Reprinter()
 
 	def __init__(self, reset = False):
 
@@ -92,53 +66,6 @@ class Database(object):
 		self.__createdb()
 		gs.db = self
 
-
-	def getCount(self):
-		self.count += 1
-		return(str(self.count))
-
-	def getA(self):
-
-		 return(7 + int(random.random() * 5))
-
-	def recTest(self):
-		
-		blah = []
-		for i in range(0, self.getA()):
-			if (random.random() < self.b):
-				blah.append(self.getCount())
-			else:
-				blah.append([])
-				for j in range(0, self.getA()):
-					if (random.random() < self.b):
-						blah[i].append(self.getCount())
-					else:
-						blah[i].append([])
-						for k in range(0, self.getA()):
-							if (random.random() < self.b):
-								blah[i][j].append(self.getCount())
-							else:
-								blah[i][j].append([])
-								for l in range(0, self.getA()):
-									if (random.random() < self.b):
-										blah[i][j][k].append(self.getCount())
-									else:
-										blah[i][j][k].append([])
-										for m in range(0, self.getA()):
-											if (random.random() < self.b):
-												blah[i][j][k][l].append(self.getCount())
-											else:
-												blah[i][j][k][l].append([])
-												for n in range(0, self.getA()):
-													if (random.random() < self.b):
-														blah[i][j][k][l][m].append(self.getCount())
-													else:
-														blah[i][j][k][l][m].append([])
-														for o in range(0, self.getA()):
-															blah[i][j][k][l][m][n].append(self.getCount())
-		print(blah)
-		print(self.__sortmsgs(0, blah))
-		print(self.a)
 
 	def __setFieldsFromDB(self):
 		
@@ -447,10 +374,9 @@ class Database(object):
 
 	def getTriggers(self, group):
 		
-		if (not (0 < group <= len(self.__groups))):
+		if (not group in self.__groups.keys()):
 			self.lastResult = False
-			print("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
-			return
+			return("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
 		subquery = "(SELECT plantID FROM groups WHERE groupID = {})".format(group)
 		query = "SELECT lowertrig, uppertrig FROM plants WHERE plantID = {};".format(subquery)
 		triggers = self.__dbRead(query)
@@ -469,10 +395,9 @@ class Database(object):
 	def getContainerHistory(self, group):
 		"""Returns the names and some info of all the plants associated with a conainer."""
 		
-		if (not (0 < group <= len(self.__groups))):
+		if (not group in self.__groups.keys()):
 			self.lastResult = False
-			print("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
-			return
+			return("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
 		query   = "select p.name, s.species, total(w.amount)/1000 as total, p.dateRemoved == 0 as moi"
 		query  += "from plants as p"
 		query  += "left join plantTypes as s on s.typeID = p.plantType"
@@ -721,7 +646,7 @@ if __name__ == "__main__":
 	for i in range(4):
 		db.setTriggers(i + 1, 3000 + random.random() * 100, 3500 + random.random() * 100)
 	for i in range(4):
-		db.getTriggers(i + 1)
+		db.getTriggers("group" + str(i + 1))
 	for i in range(25):
 		wtrEvent(2)
 	db.addplant("NuMex Twilight", 2, "Chili pepper")

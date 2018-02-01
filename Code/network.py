@@ -575,22 +575,6 @@ class flt(netCommand):
 
 		return("fltdev pinstate: " + str(gs.fltdev.getStatus()) + " low_water state: " + str(gs.fltdev.low_water))
 
-class dlg(netCommand):
-
-	def __init__(self):
-		self.command = "daylog"
-		self.name = "Daylog"
-		self.args = ""
-		self.help = "Run this to make an MMAdb if you haven't enabled it."
-
-	def runCommand(self, args = None):
-		if (not gs.db.mma):
-			gs.db.mma = True
-			gs.db.daylog()
-			return("Done.")
-		else:
-			return("Function already enabled.")
-	
 class pst(netCommand):
 
 	def __init__(self):
@@ -711,9 +695,11 @@ class get(netCommand):
 				check, chan = self.channelCheck(args[0])
 				if (not check):
 					return(chan)
-				reply += ("Values of group " + str(gs.ch_list[chan].chan) + ":\n")
+				reply += ("Values of group " + gs.control.getGroupName(chan) + ":\n")
 				reply += ("Low\t|Now\t|High\n")
-				reply += (str(gs.ch_list[chan].lowtrig) + "\t|" + str(gs.adc.getMeasurement(gs.ch_list[chan].name, 0)) + "\t|" + str(gs.ch_list[chan].hightrig))
+				lt, ht = gs.control.getTriggers(chan)
+				lvl = gs.control.requestData("soil-g" + chan[-1])
+				reply += "{}\t|{}\t|{}\t|{}\n".format(name, lt, lvl, ht)
 				return (reply)
 			return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 
@@ -936,6 +922,25 @@ class rmp(netCommand):
 			return(gs.db.removePlant(group))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 
+class cth(netCommand):
+
+	def __init__(self):
+		self.command = "cthist"
+		self.name = "Container history"
+		self.args = "%groupnr"
+		self.help = "Returns the names and some stats for all the plants in the container."
+		self.help += ""
+
+	def runCommand(self, args = None):
+		if (args is not None):
+			check, chan = self.channelCheck(args[0])
+			if (not check):
+				return(chan)
+			# Maybe do some formatting.
+			return(gs.db.getContainerHistory(chan))
+		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
+
+
 class Server(object):
 	
 	# commands
@@ -968,10 +973,10 @@ class Server(object):
 					 mst(), dat(), utm(),
 					 hlp(), thr(), wtr(),
 					 vts(), wts(), tsm(),
-					 spf(), flt(), dlg(),
-					 pst(), set(), get(),
-					 gra(), log(), adp(),
-					 rmp() ]
+					 spf(), flt(), pst(),
+					 set(), get(), gra(),
+					 log(), adp(), rmp(),
+					 cth()  ]
 
 		for command in comms:
 			self.commands[command.command] = command
