@@ -18,9 +18,9 @@ cpu, cpu
 totalw, 14
 
 # pwr
-# name,	addr, V,		
-5v,		0x40, 5,		
-12v,		0x45, 12,	
+# name,	addr, V,		PGA,	BADC,	SADC,	mode,	maxCurrent,	rShunt
+5v,		0x40, 5,		2,		8,		8,		7,		4,				0.040
+12v,		0x45, 12,	2,		8,		8,		7,		4,				0.040
 #
 # group
 # vpin, ff1, ff2, adcChan, flowpin, temploc

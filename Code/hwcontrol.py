@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.12	30-01-2018
+# v0.9.13	01-02-2018
 
 import csv
 from datetime import datetime, timedelta
@@ -292,8 +292,7 @@ class hwControl(object):
 							elif (curType == "flow" and gs.hwOptions["flowsensors"]):
 								self.__flowSensors["flow-g" + i] = flowsensor.flowMeter(output[1])
 							elif (curType == "pwr" and gs.hwOptions["powermonitor"]):
-								self.__ina[output[0]] = ina219.ina219(output[1], output[2])
-								self.__sensors[output[0]] = curType
+								self.__setINA219dev(output)
 							self.__otherSensors.append(output[0])
 				
 						# Setting sensors of groups and making group instances.
@@ -325,6 +324,13 @@ class hwControl(object):
 		self.__sensors[name] = "mst"
 		return(name)
 
+	def __setINA219dev(self, output):
+		self.__ina[output[0]] = ina219.ina219(int(output[1]), int(output[2]))
+		self.__ina[output[0]].setConfig(int(output[3]), int(output[4]), int(output[5]), int(output[6]))
+		self.__ina[output[0]].setCalibration(int(output[7]), float(output[8]))
+		self.__ina[output[0]].engage()
+		self.__sensors[output[0]] = curType
+		
 	def __setTemplate(self):
 		"""Generates the template for the formatted currentstats."""
 

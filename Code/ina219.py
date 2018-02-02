@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.1.01	30-01-2018
+# v0.1.02	01-02-2018
 
 # For details, see datasheet: http://www.ti.com/lit/ds/symlink/ina219.pdf
 
@@ -45,7 +45,7 @@ class ina219(object):
 			raise ValueError("INA219 supports -26 to +26 V.")
 
 
-	def setConfig(self, RST = False, PGA = 3, BADC = 3, SADC = 3, mode = 7):
+	def setConfig(self, PGA = 3, BADC = 3, SADC = 3, mode = 7, RST = False):
 		"""
 		For details on programming the configuration register: http://www.ti.com/lit/ds/symlink/ina219.pdf#%5B%7B%22num%22%3A179%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C0%2C720%2C0%5D
 		"""
