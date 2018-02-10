@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.8.16	27-01-2018
+# v0.8.17	09-02-2018
 
 
 from abc import ABCMeta, abstractmethod
@@ -157,7 +157,7 @@ class floatUp(object):
 					# The actual mail send
 					server = smtplib.SMTP("smtp.gmail.com:587")
 					server.starttls()
-					server.login(username,password)
+					server.login(username, password)
 					server.sendmail(fromaddr, toaddr, msg)
 					server.quit()
 					logging.debug("Sent mail to " + toaddr)
@@ -268,6 +268,7 @@ class Pump(object):
 	#channels = {
 	#chan : (valvepin, active)
 	#2 : (1B0, False) }
+	power = 560
 
 	def __init__(self, pin, sLED = None):
 		self.startTime = None
@@ -349,15 +350,16 @@ class Pump(object):
 				self.__valveOff(g.chan)
 				time.sleep(1.2)
 
-	def __pumpOn(self):
+	def on(self):
 		"""Turn the pump on."""
 		
-		logging.info("Pump turned on.")
-		self.isPumping = True
-		if (self.sLED is not None):
-			self.sLED.on()
-		self.startTime = time.time()
-		globstuff.getPinDev(self.pumpPin).output(globstuff.getPinNr(self.pumpPin), True)
+		if (self.enabled):
+			logging.info("Pump turned on.")
+			self.isPumping = True
+			if (self.sLED is not None):
+				self.sLED.on()
+			self.startTime = time.time()
+			globstuff.getPinDev(self.pumpPin).output(globstuff.getPinNr(self.pumpPin), True)
 
 	def __pumpOff(self):
 		"""Turn the pump off."""
@@ -395,32 +397,6 @@ class Pump(object):
 		return(True)
 
 
-class valve(object):
-
-	power = 250		# mA
-	__enabled = False
-	open = False
-	mcp = None
-	pin = ""
-
-	def __init__(self, pin):
-		
-		if (globstuff.getPinDev(pin).setPin(globstuff.getPinNr(pin))):
-			self.mcp = globstuff.getPinDev(pin)
-			self.pin = globstuff.getPinNr(pin)
-			self.__enabled = True
-
-	def on(self):
-
-		if (self.__enabled):
-			self.open = True
-			globstuff.get
-	def off(self):
-
-		if (self.__enabled):
-			self.open = False
-	
-
 class fan(object):
 
 	__mcp = None
@@ -435,10 +411,10 @@ class fan(object):
 
 
 	def on(self):
-		pass
+		self.__mcp.output(self.__pin, True)
 
 	def off(self):
-		pass
+		self.__mcp.output(self.__pin, False)
 
 
 class globstuff:

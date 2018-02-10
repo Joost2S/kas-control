@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.13	01-02-2018
+# v0.9.14	09-02-2018
 
 import csv
 from datetime import datetime, timedelta
@@ -12,12 +12,12 @@ import time
 
 import ds18b20
 import flowsensor
+from globstuff import globstuff as gs
 import group
+import hd44780
 import ina219
+import ledbar
 import mcp3x08
-import globstuff
-
-gs = globstuff.globstuff
 
 
 class hwControl(object):
@@ -38,6 +38,8 @@ class hwControl(object):
 	__statusLED = None		# Reference to status led controller
 	__pump = None				# Reference to pump object.
 	__floatSwitch = None		# Reference to floatSwitch object
+	__LCD = None				# Reference to an hd44780 16x02 or 20x04 LCD
+	__LEDbars = []				# Reference to some LEDbars.
 	__template = ""			# Template for __currentstats
 	__currentstats = ""		# Latest output of the monitor method. Is formatted for display in console.
 	__rawStats = []			# List with the latest results from sensors.
@@ -48,13 +50,16 @@ class hwControl(object):
 
 	def __init__(self):
 		
-		self.__adc = mcp3x08.mcp3208(0, gs.mcplist[0])
+		self.__adc = mcp3x08.MCP3208(0, gs.mcplist[0])
 		self.__tempMGR = ds18b20.tdevManager()
 		self.__connectedCheckValue = self.__adc.getResolution() * 0.05
 		self.__setDataFromFile()
 		self.__statusLED = globstuff.sigLED(gs.sLEDpin)
 		self.__pump = globstuff.Pump(gs.pumpPin, self.__statusLED)
-		self.__floatSwitch = globstuff.floatUp(gs.float_switch, self.__pump, self.__statusLED)
+		if (gs.hwOptions["floatswitch"]):
+			self.__floatSwitch = globstuff.floatUp(gs.float_switch, self.__pump, self.__statusLED)
+		if (gs.hwOptions["lcd"]):
+			self.__LCD = hd44780.Adafruit_CharLCD(gs.LCD_RS, gs.LCD_E, [gs.LCD4, gs.LCD5, gs.LCD6, gs.LCD7])
 		self.__template = self.__setTemplate()
 		self.setTimeRes()
 		self.__check_connected()
@@ -62,7 +67,7 @@ class hwControl(object):
 
 
 	def requestData(self, type = None, name = None, caller = None, perc = False):
-		""""""
+		"""Main method for getting sensor data."""
 
 		if (self.__spoof):
 			return(self.__getSpoofData(type, name, caller))
@@ -142,19 +147,28 @@ class hwControl(object):
 			return(False)
 		
 	def requestPumping(self, name, forTime = None):
+		"""
+		Method to request pumping water to a container. Requests will be accepted if
+		enough resources are available, else it will be entered into a queue.
+		"""
 
 		check = False
+		# Loop to wait while resources become available.
 		while (not check):
-			check, msg = self.__chekPumpAvail(self.__groups[name])
+			if (not self.__pump.isPumping):
+				check, msg = self.__chekPumpAvail(self.__groups[name].valve, self.__pump)
+			else:
+				check, msg = self.__chekPumpAvail(self.__groups[name].valve)
 			logging.info(msg)
 			if (not check):
 				time.sleep(1)
 			if (not gs.running):
 				return
-		if (not self.__pump.isPumping):
-			self.__pump.on()
-			time.sleep(0.1)
 		self.__groups[name].valve.On()
+		# Turning on pump if not already pumping.
+		if (not self.__pump.isPumping):
+			time.sleep(0.1)
+			self.__pump.on()
 		if (forTime is not None):
 			for i in range(int(forTime)):
 				time.sleep(1)
@@ -179,9 +193,11 @@ class hwControl(object):
 	def __chekPumpAvail(self, *cur):
 		"""Add calendar function."""
 
+		if (not self.__pump.enabled):
+			return(False, "Pump is currently disabled.")
 		current = self.__ina["12v"].getCurrent()		# get current power draw from the PSU.
 		for c in cur:
-			current += c
+			current += c.power
 		print("Expected power draw: " + str(current) + " mA")
 		return(True, "All good.")
 
@@ -253,7 +269,7 @@ class hwControl(object):
 	def __setDataFromFile(self):
 		
 		tempAddresses = self.__tempMGR.getTdevList()
-		types = ["temp", "cputemp", "light", "flow", "pwr", "group"]
+		types = ["temp", "cputemp", "light", "flow", "pwr", "ledbar", "group"]
 		with open(gs.sensSetup, "r", newline = "") as filestream:
 			file = csv.reader(filestream, delimiter = ",")
 
@@ -294,6 +310,13 @@ class hwControl(object):
 							elif (curType == "pwr" and gs.hwOptions["powermonitor"]):
 								self.__setINA219dev(output)
 							self.__otherSensors.append(output[0])
+							if (curType == "ledbar"):
+								if (gs.hwOptions["ledbars"]):
+									try:
+										self.__LEDbars[output[0]] = ledbar.LEDbar(output[1], output[2], output[3:])
+									except Exception as msg:
+										logging.error(msg)
+										raise Exception
 				
 						# Setting sensors of groups and making group instances.
 						else:
@@ -308,6 +331,7 @@ class hwControl(object):
 								self.__sensors["temp-g" + i] = "temp"
 								self.__tempMGR.setDev("temp-g" + i, tdev)
 							flow = self.__setFlowSensor("flow-g" + i, output[4])
+							self.__flowSensors["flow-g" + i] = flowsensor.flowMeter(output[1])
 							if (gs.hwOptions["flowSensors"]):
 								self.__sensors["flow-g" + i] = "flow"
 								self.__flowSensors["flow-g" + i] = flowsensor.flowMeter(output[4])
@@ -325,11 +349,11 @@ class hwControl(object):
 		return(name)
 
 	def __setINA219dev(self, output):
-		self.__ina[output[0]] = ina219.ina219(int(output[1]), int(output[2]))
+		self.__ina[output[0]] = ina219.INA219(int(output[1]), int(output[2]))
 		self.__ina[output[0]].setConfig(int(output[3]), int(output[4]), int(output[5]), int(output[6]))
 		self.__ina[output[0]].setCalibration(int(output[7]), float(output[8]))
 		self.__ina[output[0]].engage()
-		self.__sensors[output[0]] = curType
+		self.__sensors[output[0]] = "pwr"
 		
 	def __setTemplate(self):
 		"""Generates the template for the formatted currentstats."""
@@ -373,17 +397,20 @@ class hwControl(object):
 		Will also start methods/actions based on the sensor input."""
 
 		# output format:
-		# timestamp:
-		# plant	|group1	|group2	|group3	|group4	|group5	|group6
-		# moist	|soil1	|soil2	|soil3	|soil4	|soil5	|soil6
-		# water	|water1	|water2	|water3	|water4	|water5	|water6
-		# temp	|temp1	|temp2	|temp3	|temp4	|temp5	|temp6
+		# {timestamp}:
+		# plant	|{group1}|{group2}|{group3}|{group4}|{group5}|{group6}
+		# moist	|{soil1}	|{soil2}	|{soil3}	|{soil4}	|{soil5}	|{soil6}
+		# water	|{water1}|{water2}|{water3}|{water4}|{water5}|{water6}
+		# temp	|{temp1}	|{temp2}	|{temp3}	|{temp4}	|{temp5}	|{temp6}
 		# Other sensors:
 		#	Light:	Temps:										Water:
-		#	|ambient	|sun		|shade	|ambient	|cpu		|total
-		#	|light	|temp		|temp		|temp		|temp		|water
+		#	|{ambient}|{sun}	|{shade}	|{ambient}|{cpu}	|{total}
+		#	|{light}	|{temp}	|{temp}	|{temp}	|{temp}	|{water}
 
 		
+		#	Indicate to user that the system is up and running.
+		if (not gs.hwOptions["lcd"]):
+			self.__statusLED.blinkSlow(3)
 		try:
 			while (gs.running):
 				data = []
@@ -431,6 +458,12 @@ class hwControl(object):
 
 				# Formatting data.
 				self.__currentstats = self.__template.format(*data)
+
+				# Outputting data to availabe outouts:
+				if (gs.hwOptions[""]):
+					pass
+				if (gs.hwOptions[""]):
+					pass
 				print(self.__currentstats)
 
 				# Waiting for next interval of timeRes to start next itertion of loop.
@@ -528,3 +561,6 @@ class hwControl(object):
 
 		self.__statusLED.off()
 		self.__pump.disable() #Shuts down the valves as well.
+		# Disable valve in each Group.
+		# Disable LCD if option.
+		# Disable status LED if option.

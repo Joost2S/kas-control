@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.1.02	01-02-2018
+# v0.1.03	09-02-2018
 
 # For details, see datasheet: http://www.ti.com/lit/ds/symlink/ina219.pdf
 
@@ -9,7 +9,7 @@ import logging
 import smbus
 
 
-class ina219(object):
+class INA219(object):
 
 	__addr = 0				# i2c device address
 	__bus = None			# i2c bus
@@ -42,7 +42,7 @@ class ina219(object):
 		if (-26 <= lineV <= 26):
 			self.__lineV = lineV
 		else:
-			raise ValueError("INA219 supports -26 to +26 V.")
+			raise ValueError("INA219 supports line voltage from -26 to +26 V.")
 
 
 	def setConfig(self, PGA = 3, BADC = 3, SADC = 3, mode = 7, RST = False):
@@ -62,17 +62,14 @@ class ina219(object):
 			# Value for the configuration register.
 			self.__configVal = int(RST) * (2 ** 15)
 			# BRNG: Bus voltage range (16V : 0, 32V : 1)
-			self.__configVal += int(self.__lineV >= 16) * (2 ** 13)
+			self.__configVal += int(self.__lineV > 16) * (2 ** 13)
 			# PGA sets the gain and range of the shunt voltage.
 			self.__configVal += PGA * 2 ** 11
-			# BADC Bus ADC Resolution/Averaging
-			if (BADC > 3):
-				BADC += 4
-			self.__configVal += BADC * (2 ** 7)
-			# SADC Shunt ADC Resolution/Averaging
-			if (SADC > 3):
-				SADC += 4
-			self.__configVal += SADC * (2 ** 3)
+			# BADC Bus and Shunt ADC Resolution/Averaging
+			for v in [BADC, SADC]:
+				if (v > 3):
+					v += 4
+				self.__configVal += v * (2 ** 7)
 			self.__configVal += mode
 		else:
 			logging.debug("INA219 device on addr " + hex(self.devAddr) + " is already enabled.")

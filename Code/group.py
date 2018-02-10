@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.5.4	12-01-2018
+# v0.6.00	09-02-2018
 
 import logging
 import threading
@@ -32,7 +32,7 @@ class Group(object):
 
 		self.groupname = gname
 		self.mstName = mname
-		self.valve = valve		# do make object
+		self.valve = Valve(valve)		# do make object
 		self.connected = False			# A sensor is considered disconnected when value <= adc resolution * 0.05.
 		self.watering = False
 		self.enabled = False				# Only enabled when a plant is present and triggers have been set.
@@ -143,14 +143,14 @@ class Group(object):
 		self.setTriggers(data[1], data[2])
 		
 
-class wateringthread(globstuff.protoThread):
+class WateringThread(globstuff.protoThread):
 	def run(self):
 		print("Starting thread{0}: {1}".format(self.threadID, self.name))
 		water(self.args)
 		print("Exiting thread{0}: {1}".format(self.threadID, self.name))
 
 
-class water(object):
+class Water(object):
 
 	group = None
 	flow = 0
@@ -192,3 +192,28 @@ class water(object):
 		""""""
 
 		self.flow += 1
+
+		
+class Valve(object):
+
+	power = 250		# mA
+	open = False
+	pin = ""
+
+	def __init__(self, pin):
+		
+		gs.getPinDev(pin).setPin(gs.getPinNr(pin))
+		gs.getPinDev(pin).output(gs.getPinNr(pin), False)
+		self.pin = pin
+
+
+	def on(self):
+
+		if (self.__enabled):
+			self.open = True
+			gs.getPinDev(self.pin).output(gs.getPinNr(self.pin), True)
+
+	def off(self):
+
+		self.open = False
+		gs.getPinDev(self.pin).output(gs.getPinNr(self.pin), False)

@@ -1,14 +1,15 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.3.9	09-01-2018
+# v1.4.00	09-02-2018
 
 """
 For controlling MCP3208 and MCP3008 adc for light and moisture readings.
 FF (flip-flop) support is available per channel for when you have a flip-flop setup to prevent electrolysis.
 Select a gpio chip (raspberry pi GPIO, mcp23017, etc) as main controller for flip-flop pins.
 Alternate GPIO's can be set for each channel.
-For details, see datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/21298c.pdf
+For details about MCP3208/3204: http://ww1.microchip.com/downloads/en/DeviceDoc/21298c.pdf
+For Details about MCP3008/3004: http://ww1.microchip.com/downloads/en/DeviceDoc/21295C.pdf
 """
 
 from abc import ABCMeta, abstractmethod
@@ -37,7 +38,7 @@ class channel(object):
 		self.ffstate = False
 
 
-class adc(object):
+class MCP3x0x(object):
 
 	__metaclass__ = ABCMeta
 	__spi = None				# Sets the SPI channel.
@@ -48,6 +49,7 @@ class adc(object):
 	__debug = False			# To enable debug mode if you need to check the circuit.
 	__debug_output = ""		# Select to send the data to console or to log it. Options "cons" or "log".
 	__tlock = None
+	__chanAmount = 0
 
 
 	def __init__(self, spi, gpio = None):
@@ -64,25 +66,23 @@ class adc(object):
 	def __readChannel(self, channel):
 		pass
 
-
 	def setSamples(self, samples):
 		"""Set how many individual reads you want to return for each measurement."""
 
 		if (samples > 0):
 			self.__samples = samples
 
-
 	def setChannel(self, name, chan, p1 = None, p2 = None, gpio = None):
 		"""Define flip-flop pins for each channel. Optional to define an alternate gpio for the channel."""
 		
-		if (not 0 >= chan <= 7):
+		if (not (0 >= chan > self.__chanAmount)):
 			logging.debug("Incorrect channel: " + str(chan))
 			return
 		if (name in self.__channels):
 			logging.debug("Name must be unique. Please make sure all channels have a different name. " + str(name))
 			return
-		for b in self.__channels:
-			if (self.__channels[b].chan == chan):
+		for c in self.__channels:
+			if (self.__channels[c].chan == chan):
 				logging.debug("Channel defined already: " + str(chan))
 				return
 		if (gpio is None):
@@ -93,8 +93,7 @@ class adc(object):
 			self.__channels[name] = channel(chan, mcp, p1, p2)
 		else:
 			logging.debug("Only one flip flop pin given, please give 2 pins for a complete flip-flop circuit.")
-			
-
+		
 	def getMeasurement(self, name, perc):
 		"""Get a reading of soil moisture level."""
 
@@ -113,7 +112,6 @@ class adc(object):
 		if(perc):
 			return(self.__convertToPrec(level, 1))
 		return(round(level, 1))
-
 
 	def setDebug(self, output):
 		"""\t\tEnable debug mode to provide more data, either in
@@ -155,16 +153,14 @@ class adc(object):
 		elif (self.__debug_output == "cons"):
 			print(dbgmsg)
 			
-
 	def __convertToPrec(self, data, places):
 		"""Returns the percentage value of the number."""
 
 		m = ((data * 100) / float(self.__bits))
 		return(round(m, places))
+	
 
-
-
-class mcp3208(adc):
+class MCP320x(MCP3x0x):
 
 	__bits = 4095
 
@@ -180,9 +176,8 @@ class mcp3208(adc):
 		else:
 			return(self.__bits - data)
 
-
-
-class mcp3008(adc):
+		
+class MCP300x(MCP3x0x):
 	
 	__bits = 1023
 
@@ -195,3 +190,23 @@ class mcp3008(adc):
 			return(data)
 		else:
 			return(self.__bits - data)
+
+
+class MCP3004(MCP300x):
+
+	__chanAmount = 4
+
+
+class MCP3008(MCP300x):
+
+	__chanAmount = 8
+
+
+class MCP3204(MCP320x):
+
+	__chanAmount = 4
+
+
+class MCP3208(MCP320x):
+
+	__chanAmount = 8

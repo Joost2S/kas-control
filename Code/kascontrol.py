@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.7.7	27-01-2018
+# v0.7.8	09-02-2018
 
 import logging
 import RPi.GPIO as GPIO
@@ -10,6 +10,7 @@ import time
 
 import database
 from globstuff import globstuff as gs
+import globstuff
 import hwcontrol
 import network
 import pushbutton
@@ -68,9 +69,6 @@ try:
 	gs.draadjes.append(monitor)
 
 	gs.server.makeSocket()
-	#	Indicate to user that the system is up and running.
-	if (not gs.hwOptions["lcd"]):
-		gs.sLED.blinkSlow(3)
 	gs.server.serverLoop()
 except network.shutdownError:
 	logging.info("Shutdown by client.")

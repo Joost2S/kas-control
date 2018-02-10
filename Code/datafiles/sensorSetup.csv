@@ -31,3 +31,9 @@ totalw, 14
 	1A7, 1B3, 0B2,	4,			1B6,		000006d218ac
 	1A1, 1B5, 0B4,	5,			1B7,		03168bf394ff
 #	1A2, 1B7, 0B6,	6,			None,		None
+
+#ledbar
+# name,	lBar,	Icount,	ledPins
+temps,	17,	1,			2A0, 2A1, 2A2, 2A3, 2A4, 2A5, 2A6, 3A4, 3A5, 3A6, 3A7, 1B0, 1B1, 1B2, 3B3, 3B2, 3B0, 3B1
+ 
+mst,		15,	3,			2B7, 2B6, 2B5, 2B4, 2B3, 2B2, 2A7, 3A0, 3A1, 3A2, 3A3, 1B5, 1B4, 1B6, 3B7, 3B5, 3B4, 3B6
