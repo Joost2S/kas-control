@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.14	09-02-2018
+# v0.9.15	10-02-2018
 
 import csv
 from datetime import datetime, timedelta
@@ -13,11 +13,13 @@ import time
 import ds18b20
 import flowsensor
 from globstuff import globstuff as gs
+import globstuff
 import group
 import hd44780
 import ina219
 import ledbar
 import mcp3x08
+import PowerLEDs
 
 
 class hwControl(object):
@@ -36,6 +38,7 @@ class hwControl(object):
 	__flowSensors = {}		# List of all flowsensors. {name : flowMeter object}
 	__ina = {}					# Powermonitors. {name : ina219 object}
 	__statusLED = None		# Reference to status led controller
+	__plcontroller = None	# Reference to powerLED controller
 	__pump = None				# Reference to pump object.
 	__floatSwitch = None		# Reference to floatSwitch object
 	__LCD = None				# Reference to an hd44780 16x02 or 20x04 LCD
@@ -45,6 +48,9 @@ class hwControl(object):
 	__rawStats = []			# List with the latest results from sensors.
 	__timeRes = 0.0			# How often the sensors get polled in seconds.
 	__connectedCheckValue = 0	# If value is below this threhold, sensor is considered disconnected
+	__maxPower = 1.6			# Maximum allowed power draw in amps.
+	__lastPowerRequest = 0	# Time function to make sure a power request is enacted and current power draw includes last request.
+	__maxPSUtemp = 80.0		# Maximum allowed temperature for PSU. Above this, don't accept further power draw.
 	__enabled = True			# Dunno.
 	__spoof = False
 
@@ -59,7 +65,9 @@ class hwControl(object):
 		if (gs.hwOptions["floatswitch"]):
 			self.__floatSwitch = globstuff.floatUp(gs.float_switch, self.__pump, self.__statusLED)
 		if (gs.hwOptions["lcd"]):
-			self.__LCD = hd44780.Adafruit_CharLCD(gs.LCD_RS, gs.LCD_E, [gs.LCD4, gs.LCD5, gs.LCD6, gs.LCD7])
+			self.__LCD = hd44780.Adafruit_CharLCD(gs.LCD_RS, gs.LCD_E, gs.LCD4, gs.LCD5, gs.LCD6, gs.LCD7, *gs.LCD_SIZE, gs.LCD_L)
+		if (gs.hwOptions["powermonitor"]):
+			self.__plcontroller = PowerLEDs.PowerLEDcontroller()
 		self.__template = self.__setTemplate()
 		self.setTimeRes()
 		self.__check_connected()
@@ -107,26 +115,32 @@ class hwControl(object):
 						if (name[-2] == "g" and not gs.hwOptions["soiltemp"]):
 							return(None)
 						return(self.__tempMGR.getMeasurement(name))
-					if (type == "pwr"):
-						# name = "12vp"
-						if (name[-1] == "p"):
-							return(self.__ina[name[:-1]].getPower())
-						# name = "12vc"
-						if (name[-1] == "c"):
-							return(self.__ina[name[:-1]].getCurrent())
-						# name = "12vv"
-						if (name[-1] == "v"):
-							return(self.__ina[name[:-1]].getVolage())
+				elif (type == "pwr"):
+					# name = "12vp"
+					if (name[-1] == "p"):
+						return(self.__ina[name[:-1]].getPower())
+					# name = "12vc"
+					if (name[-1] == "c"):
+						return(self.__ina[name[:-1]].getCurrent())
+					# name = "12vv"
+					if (name[-1] == "v"):
+						return(self.__ina[name[:-1]].getVolage())
+					# name = "12vs"
+					if (name[-1] == "s"):
+						return(self.__ina[name[:-1]].getShuntVoltage())
+				# If name is the name of a group with option for sensortype.
+				elif (name in self.__groups.keys()):
+					if (type == "mst"):
+						return(self.__groups[name].getM())
+					elif (type == "temp"):
+						return(self.__groups[name].getT())
+					elif (type == "flow"):
+						return(self.__groups[name].getF())
+					else:
+						return(self.__groups[name].getSensorData())
 				else:
 					logging.warning("Requested sensor does not exist. Name: {}".format(name))
 					return(False)
-			elif (name in self.__groups.keys()):
-				if (type == "mst"):
-					return(self.__groups[name].getM())
-				elif (type == "temp"):
-					return(self.__groups[name].getT())
-				elif (type == "flow"):
-					return(self.__groups[name].getF())
 			# Get data from all sensors of specified type.
 			# return [[sensorname, value], ...]
 			elif (type is not None):
@@ -164,7 +178,7 @@ class hwControl(object):
 				time.sleep(1)
 			if (not gs.running):
 				return
-		self.__groups[name].valve.On()
+		self.__groups[name].valve.on()
 		# Turning on pump if not already pumping.
 		if (not self.__pump.isPumping):
 			time.sleep(0.1)
@@ -179,15 +193,13 @@ class hwControl(object):
 	def endPumpRequest(self, chan):
 
 		i = 0
-		with self.lock:
-			for g in self.__groups.values():
-				if (g.valve.open):
-					if (not self.valves[chan] == v):
-						i += 1
-			if (i == 0):
-				self.valves[chan].open = False
-				self.pump.off()
-				time.sleep(0.1)
+		for g in self.__groups.values():
+			if (g.valve.open):
+				if (not self.__groups[chan].valve is g.valve):
+					i += 1
+		if (i == 0):
+			self.__pump.off()
+			time.sleep(0.1)
 		self.valves[chan].off()
 			
 	def __chekPumpAvail(self, *cur):
@@ -195,12 +207,27 @@ class hwControl(object):
 
 		if (not self.__pump.enabled):
 			return(False, "Pump is currently disabled.")
-		current = self.__ina["12v"].getCurrent()		# get current power draw from the PSU.
-		for c in cur:
-			current += c.power
-		print("Expected power draw: " + str(current) + " mA")
+		if (not self.__requestPower(cur)):
+			return(False, "Not enough power available.")
 		return(True, "All good.")
 
+	def __requestPower(self, *cur):
+
+		if (gs.hwOptions["powermonitor"]):
+			# There is a delay of a second so the effects of the last request can be noticed.
+			while ((time.time() - self.__lastPowerRequest) < 1.0):
+				time.sleep(1)
+			self.__lastPowerRequest = time.time()
+			current = self.__ina["12v"].getCurrent()		# get current power draw from the PSU.
+			for c in cur:
+				current += c.power
+			print("Expected power draw: " + str(current) + " mA")
+			if (current > self.__maxPower):
+				return(False)
+		else:
+			pass
+		return(True)
+		
 	def disable(self):
 
 		self.__enabled = False
@@ -292,6 +319,14 @@ class hwControl(object):
 
 						# Setting temp, light and flowsensors.
 						if (curType in types[:-1]):
+							if (curType == "ledbar"):
+								if (gs.hwOptions["ledbars"]):
+									try:
+										self.__LEDbars[output[0]] = ledbar.LEDbar(output[1], output[2:])
+									except Exception as msg:
+										logging.error(msg)
+										raise Exception
+								continue
 							if (curType == "temp"):
 								if (output[1] in tempAddresses):
 									tdev = output[1]
@@ -304,19 +339,12 @@ class hwControl(object):
 								self.__sensors[output[0]] = curType
 							elif (curType == "light"):
 								self.__sensors[output[0]] = curType
-								gs.adc.setChannel(output[0], output[1])
+								self.__adc.setChannel(output[0], output[1])
 							elif (curType == "flow" and gs.hwOptions["flowsensors"]):
 								self.__flowSensors["flow-g" + i] = flowsensor.flowMeter(output[1])
 							elif (curType == "pwr" and gs.hwOptions["powermonitor"]):
 								self.__setINA219dev(output)
 							self.__otherSensors.append(output[0])
-							if (curType == "ledbar"):
-								if (gs.hwOptions["ledbars"]):
-									try:
-										self.__LEDbars[output[0]] = ledbar.LEDbar(output[1], output[2], output[3:])
-									except Exception as msg:
-										logging.error(msg)
-										raise Exception
 				
 						# Setting sensors of groups and making group instances.
 						else:
@@ -326,25 +354,28 @@ class hwControl(object):
 								tdev = output[5]
 							else:
 								tdev = None
-							mst = self.__setSoilSensor("soil-g" + i, output[3], output[2], output[1])
+							mname = "soil-g" + i
+							tname = None
+							fname = None
 							if (gs.hwOptions["soiltemp"] and tdev is not None):
-								self.__sensors["temp-g" + i] = "temp"
-								self.__tempMGR.setDev("temp-g" + i, tdev)
-							flow = self.__setFlowSensor("flow-g" + i, output[4])
-							self.__flowSensors["flow-g" + i] = flowsensor.flowMeter(output[1])
+								tname = "temp-g" + i
 							if (gs.hwOptions["flowSensors"]):
-								self.__sensors["flow-g" + i] = "flow"
-								self.__flowSensors["flow-g" + i] = flowsensor.flowMeter(output[4])
-							else:
-								logging.info("flowSensors not available.")
-							self.__groups[name] = group.Group()#output	# group instance
+								fname = "flow-g" + i
+							mst = self.__setSoilSensor(mstname, output[3], output[2], output[1])
+							if (gs.hwOptions["soiltemp"] and tdev is not None):
+								self.__sensors[tname] = "temp"
+								self.__tempMGR.setDev(tname, tdev)
+							if (gs.hwOptions["flowSensors"]):
+								self.__sensors[fname] = "flow"
+								self.__flowSensors[fname] = flowsensor.flowMeter(output[4])
+							self.__groups[name] = group.Group(name, mname, tname, fname, output[0])
 							self.__chanlist.append(name)
 
 	def __setSoilSensor(self, name, channel, ff1, ff2):
 
 		gs.getPinDev(ff1).setPin(gs.getPinNr(ff1), False)
 		gs.getPinDev(ff2).setPin(gs.getPinNr(ff2), False)
-		gs.adc.setChannel(name, channel, ff1, ff2, gs.getPinDev(ff1))
+		self.__adc.setChannel(name, channel, ff1, ff2, gs.getPinDev(ff1))
 		self.__sensors[name] = "mst"
 		return(name)
 
@@ -411,6 +442,7 @@ class hwControl(object):
 		#	Indicate to user that the system is up and running.
 		if (not gs.hwOptions["lcd"]):
 			self.__statusLED.blinkSlow(3)
+
 		try:
 			while (gs.running):
 				data = []
@@ -434,15 +466,19 @@ class hwControl(object):
 						break
 				
 				# Get data from other sensors.
+				bardata = []
 				sdata = []	# Data from the other sensors.
 				for s in self.__otherSensors:
-					if (self.__sensors[s][1] == "light"):
+					if (self.__sensors[s] == "light"):
 						sdata.append(gs.adc.getMeasurement(s, 0))
-					elif (self.__sensors[s][1] == "temp"):
-						if (self.__sensors[s][0] == "cpu"):
-							sdata.append(gs.getCPUtemp())
-						else:
-							sdata.append(self.__sensors[s][0].getTemp())
+					elif (self.__sensors[s] == "temp"):
+						sdata.append(self.__sensors[s][0].getTemp())
+						if (s == "PSU"):
+							if (sdata[-1] > self.__maxPSUtemp):
+								pass
+								#doEmergencyThing()
+					elif (self.__sensors[s] == "cputemp"):
+						sdata.append(gs.getCPUtemp())
 					elif (self.__sensors[s][1] == "flow"):
 						sdata.append(self.__sensors[s][0].getFlowRate())
 
@@ -460,10 +496,11 @@ class hwControl(object):
 				self.__currentstats = self.__template.format(*data)
 
 				# Outputting data to availabe outouts:
-				if (gs.hwOptions[""]):
+				if (gs.hwOptions["lcd"]):
 					pass
-				if (gs.hwOptions[""]):
-					pass
+				if (gs.hwOptions["ledbars"]):
+					self.__LEDbars["mst"].updateBar(gn, gm)
+					self.__LEDbars["teps"].updateBar()
 				print(self.__currentstats)
 
 				# Waiting for next interval of timeRes to start next itertion of loop.
@@ -560,7 +597,10 @@ class hwControl(object):
 	def shutdown(self):
 
 		self.__statusLED.off()
-		self.__pump.disable() #Shuts down the valves as well.
-		# Disable valve in each Group.
-		# Disable LCD if option.
-		# Disable status LED if option.
+		self.__pump.disable()
+		# Turn off valve in each Group.
+		for g in self.__groups.values():
+			g.valve.off()
+		# reset INA219 devices if option.
+		# Turn off LCD if option.
+		# Turn off status LED if option.

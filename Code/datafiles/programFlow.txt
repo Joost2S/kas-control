@@ -7,10 +7,11 @@
 		- set connectedValue as .05 * adc resolution
 		- init tempManager
 		- init statusLED
+		- init powerLEDS
 		- init pump
 		- init float switch
-		- init of 16x02/20x04 LCD		FUTURE
-		- init of LEDbars					FUTURE
+		- init of 16x02/20x04 LCD
+		- init of LEDbars
 		- read sensorSetup.csv -->
 			- (add name of all sensors to sensors[name] = sensorType)
 			- (add name of sensors not belonging to groups to otherSensors[])

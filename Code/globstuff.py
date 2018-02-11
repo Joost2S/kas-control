@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.8.17	09-02-2018
+# v0.8.18	10-02-2018
 
 
 from abc import ABCMeta, abstractmethod
@@ -256,14 +256,7 @@ class Pump(object):
 		return(self.__sLED)
 	@sLED.setter
 	def sLED(self, sLED):
-		self.__sLED = sLED	  
-	# channels
-	@property
-	def channels(self):
-		return(self.__channels)
-	@channels.setter
-	def channels(self, channels):
-		self.__channels = channels
+		self.__sLED = sLED
 
 	#channels = {
 	#chan : (valvepin, active)
@@ -276,49 +269,13 @@ class Pump(object):
 		self.isPumping = False
 		self.sLED = sLED
 		self.enabled = False
-		self.channels = {}
-
-	def setChannel(self, channel, pin):
-		"""Use this to set a channel for pumping."""
-
-		self.channels[channel] = [pin, False]
-
-	def waterChannel(self, group, t):
-		"""\t\tWill pump water to the selected channel when possible.
-		Time in sec."""
-
-		if (group.chan in self.channels):
-			if (self.enabled):
-				self.channels[group.chan][1] = True
-				self.__valveOn(group.chan)
-				if (not self.isPumping):
-					time.sleep(0.1)
-					self.__pumpOn()
-				for i in range(t):
-					if (not self.enabled or not group.connected):
-						break
-					else:
-						time.sleep(1)
-				self.channels[group.chan][1] = False
-				time.sleep(0.01)
-				pumping = False
-				for chan in self.channels.values():
-					if (chan[1]):
-						pumping = True
-				if (not pumping):
-					self.__pumpOff()
-					time.sleep(0.1)
-				self.__valveOff(group.chan)
 
 	def disable(self):
 		"""Disables the ability to pump."""
 
 		print("Pump disabled.")
 		self.enabled = False
-		self.__pumpOff()
-		time.sleep(0.1)
-		for chan in self.channels.keys():
-			self.__valveOff(chan)
+		self.off()
 
 	def enable(self):
 		"""Re-enable pumping ability."""
@@ -326,6 +283,7 @@ class Pump(object):
 		if (not globstuff.testmode):
 			self.enabled = True
 
+	# Move to hwcontrol
 	def demo(self, groups, t):
 		"""When in testmode, you can test the watering hardware."""
 
@@ -361,7 +319,7 @@ class Pump(object):
 			self.startTime = time.time()
 			globstuff.getPinDev(self.pumpPin).output(globstuff.getPinNr(self.pumpPin), True)
 
-	def __pumpOff(self):
+	def off(self):
 		"""Turn the pump off."""
 
 		self.isPumping = False
@@ -372,30 +330,7 @@ class Pump(object):
 		if (self.startTime is not None):
 			logging.info("Pump turned off. Pumped for " + str(round(time.time() - self.startTime, 2)) + " seconds.")
 			self.startTime = None
-
-	def __valveOn(self, chan):
-		"""Turn on a valve."""
-
-		self.channels[chan][1] = True
-		globstuff.getPinDev(self.channels[chan][0]).output(globstuff.getPinNr(self.channels[chan][0]), True)
-		
-	def __valveOff(self, chan):
-		"""Turn off a valve."""
-
-		if (self.__isInt(chan)):
-			chan = (chan,)
-
-		for c in chan:
-			self.channels[c][1] = False
-			globstuff.getPinDev(self.channels[c][0]).output(globstuff.getPinNr(self.channels[c][0]), False)
-
-	def __isInt(self, obj):
-		try:
-			blah = int(obj)
-		except:
-			return(False)
-		return(True)
-
+			
 
 class fan(object):
 
@@ -452,6 +387,11 @@ class globstuff:
 	LCD_E = 19
 	LCD_RS = 13
 	LCD_L = 12
+	LCD_SIZE = [16, 2]
+
+	powerLEDpins = ["43", "42", "41", "40"]
+
+	fanPin = "44"
 
 	# Networking vars:
 	host = ""							# Hostname.

@@ -18,7 +18,9 @@ Features
   - Basic encryption is implemented with openSSL
 - Database
   - All sensor data is logged
-  - Add a name and plant type to keep track of which plant you've grown
+  - Add a name and plant type to keep track of which plants you've grown
+- 5v/12v 4A PSU PCB with INA219 power monitor. PCB files are available, haven't tested it yet.
+  - 4 powerLED connectors are available for 350/500/700mA powerLED strips.
   
 Future Features
 ---------------
@@ -28,7 +30,6 @@ Future Features
   - rPi camera support so you can watch your plants from all over the world
 - Database
   - Adding results such as plant size or harvest amount to each of your plants. Manual input only of course.
-- 5v/12v PSU PCB with INA219 power monitor
 - Use eventhooks
 
 Motivation
@@ -40,7 +41,7 @@ I like weed. I like electronics. I like programming. Here's the result :)
 Installation/requirements
 -------------------------
 
-- I use Arch Linux so only instructions for that.
+- I use Arch Linux so only instructions for that. Actual instructions will follow later.
 - RPi.GPIO
 - SMBus for i2c
 - spidev for SPI

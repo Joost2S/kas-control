@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.10	01-27-2017
+# v0.9.11	10-02-2018
 
 """
 This is a python driver for an i2c MCP23017. python-smbus must be installed for this driver to work.
@@ -445,6 +445,7 @@ class mcp23008(mcp230xx):
 	
 	def __init__(self, devAddr, intPin = None):
 		# Setting the interrupt pin(s) on the Raspberry Pi.
+		super(mcp23008, self).__init__(devAddr, intPin = None)
 		if (self.intPin is not None):
 			import RPi.GPIO as GPIO
 			GPIO.setup(self.intPin, GPIO.IN, pull_up_down = GPIO.PUD_UP)
@@ -541,7 +542,8 @@ class mcp23017(mcp230xx):
 		self.__GPB = GPB
 	
 	def __init__(self, devAddr, intPin = None, intPin2 = None):
-
+		
+		super(mcp23017, self).__init__(devAddr, intPin = None)
 		self.intPin2 = intPin2
 		self.hasBinput = False		#	True if there is at least one pin in the B bank set as an input.
 		if (intPin1 is not None and intPin2 is not None):

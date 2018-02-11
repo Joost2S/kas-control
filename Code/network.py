@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.0.06	29-01-2018
+# v1.1.00	10-02-2018
 
 from abc import ABCMeta, abstractmethod
 import csv
@@ -861,12 +861,10 @@ class log(netCommand):
 		if (not output == -1):
 			if (len(output) == 0):
 				msg = "No entries found."
-			if (len(output) > lines):
-				for line in output[(0 - lines):]:
-					msg += str(line)# + "\n"
-			else:
-				for line in output[(0 - lines):]:
-					msg += str(line)# + "\n"
+			if (len(output) < lines):
+				lines = len(output)
+			for line in output[0 - lines:]:
+				msg += str(line) + "\n"
 
 		return(msg)
 
@@ -928,7 +926,7 @@ class cth(netCommand):
 		self.command = "cthist"
 		self.name = "Container history"
 		self.args = "%groupnr"
-		self.help = "Returns the names and some stats for all the plants in the container."
+		self.help = "Returns the names and some stats for all the plants in the container.\n"
 		self.help += ""
 
 	def runCommand(self, args = None):
@@ -939,7 +937,96 @@ class cth(netCommand):
 			# Maybe do some formatting.
 			return(gs.db.getContainerHistory(chan))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
+	
+class led(netCommand):
 
+	def __init__(self):
+		self.command = "powerled"
+		self.name = "Toggle powerled"
+		self.args = "%LED channel%"
+		self.help = "Enter the channel of a powerLED string to toggle it on or off.\n"
+		self.help += "Channel must be set to 1 of 3 values first with the setled command.\n"
+		self.help += "There are 4 channels available.\n"
+		self.help += "If no channel is entered, an overview of the current states will be returned.\n"
+
+	def runCommand(self, args = None):
+		if (args is not None):
+			try:
+				chan = int(args[0])
+				if (not (1 <= chan <= 4)):
+					raise ValueError
+			except ValueError:
+				return("Please enter valid channel.")
+			gs.control#plcontroller.toggle(chan)
+		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
+				
+class stl(netCommand):
+
+	def __init__(self):
+		self.command = "setled"
+		self.name = "setled"
+		self.args = "%LED channel, %value"
+		self.help = "Enter a value for a channel to set.\n"
+		self.help += "Values are not remembered between restarts.\n"
+		self.help += "There are 4 channels available.\n"
+		self.help += "Possible values:\n"
+		self.help += "'1ww', for 1 watt white LEDS at 350 mA.\n"
+		self.help += "'3ww', for 3 watt white LEDS at 700 mA.\n"
+		self.help += "'3ir', for 1 watt white LEDS at 500 mA.\n"
+
+	def runCommand(self, args = None):
+		if (args is not None):
+			if (len(args) >= 2):
+				try:
+					chan = int(args[0])
+					if (not (1 <= chan <= 4)):
+						raise ValueError
+				except ValueError:
+					return("Please enter valid channel.")
+				if (args[1] in ["1ww", "3ww", "3ir"]):
+					gs.control#plcontroller.setled(chan, args[1])
+					return("Channel {} set to: '{}'. Now ready to be used.")
+		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
+	
+class pwr(netCommand):
+
+	def __init__(self):
+		self.command = "power"
+		self.name = "power readings"
+		self.args = "%power rail%, %type%"
+		self.help = "Get current power reading.\n"
+		self.help += "No arguments:\tGet all data from all rials.\n"
+		self.help += "%power rail%:\tGet data from '5v' or '12v' power rail.\n"
+		self.help += "%type%: \tGet current (c), voltage (v), power (p) or shunt voltage (s).\n"
+		self.rials = ["5v", "12v"]
+		self.options = ["c", "v", "p", "s"]
+
+	def runCommand(self, args = None):
+
+		rail = self.rials
+		options = self.options
+		if (args is not None):
+			if (args[0] in self.rials):
+				rail = [args[0]]
+				if (len(args) > 1):
+					if (args[1] in self.options):
+						options = [args[1]]
+					else:
+						return("Not a valid option.")
+			elif (args[0] in self.options):
+				options = [args[0]]
+			else:
+				return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
+		msg = ""
+		for r in rail:
+			msg += "|{}".format(self.getTabs(r))
+		msg += "\n" + "-" * (8 * len(rail)) + "\n"
+		for o in options:
+			for r in rail:
+				msg += "|{}".format(self.getTabs(gs.control.requestData(r + o)))
+			msg += "\n"
+		return(msg)
+				
 
 class Server(object):
 	
@@ -977,6 +1064,9 @@ class Server(object):
 					 set(), get(), gra(),
 					 log(), adp(), rmp(),
 					 cth()  ]
+		if (gs.hwOptions["powermonitor"]):
+			comms.extend([led(), stl(),
+					 pwr()])
 
 		for command in comms:
 			self.commands[command.command] = command

@@ -1,14 +1,13 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.6.00	09-02-2018
+# v0.6.01	10-02-2018
 
 import logging
 import threading
 import time
 
-import globstuff
-gs = globstuff.globstuff
+from globstuff import globstuff as gs
 
 class Group(object):
 	"""This object represents the combination of a soil sensor and watervalve."""
@@ -27,12 +26,11 @@ class Group(object):
 	tempName = None
 	plantName = ""
 
-
-	def __init__(self, gname, mname, tname, fname, valve, tdev, flowSensor):
+	def __init__(self, gname, mname, tname, fname, valvepin):
 
 		self.groupname = gname
 		self.mstName = mname
-		self.valve = Valve(valve)		# do make object
+		self.valve = Valve(valvepin)	# made an object
 		self.connected = False			# A sensor is considered disconnected when value <= adc resolution * 0.05.
 		self.watering = False
 		self.enabled = False				# Only enabled when a plant is present and triggers have been set.
@@ -146,7 +144,7 @@ class Group(object):
 class WateringThread(globstuff.protoThread):
 	def run(self):
 		print("Starting thread{0}: {1}".format(self.threadID, self.name))
-		water(self.args)
+		Water(self.args)
 		print("Exiting thread{0}: {1}".format(self.threadID, self.name))
 
 
@@ -209,9 +207,8 @@ class Valve(object):
 
 	def on(self):
 
-		if (self.__enabled):
-			self.open = True
-			gs.getPinDev(self.pin).output(gs.getPinNr(self.pin), True)
+		self.open = True
+		gs.getPinDev(self.pin).output(gs.getPinNr(self.pin), True)
 
 	def off(self):
 

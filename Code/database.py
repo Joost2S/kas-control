@@ -1,12 +1,12 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.3.4	31-01-2018
+# v0.3.05	10-02-2018
 
 import calendar
 from datetime import datetime, timedelta
 import logging
-import os.path
+import os
 import random
 import re
 import sqlite3 as sql
@@ -21,12 +21,13 @@ gs = globstuff.globstuff
 class Database(object):
 	
 	__allowedTypes = ["mst", "light", "flow", "temp", "cputemp", "pwr"]
-	__fields = {"light" : "light",
-				 "inside" : "temp",
-				 "outside" : "temp",
+	__fields = {"ambientl" : "light",
+				 "ambientt" : "temp",
+				 "out_sun" : "temp",
+				 "out_shade" : "temp",
 				 "PSU" : "temp",
 				 "CPU" : "cputemp",
-				 "total" : "flow",
+				 "totalw" : "flow",
 				 "soil_g1" : "mst",
 				 "soil_g2" : "mst",
 				 "soil_g3" : "mst",
@@ -43,8 +44,8 @@ class Database(object):
 				 "group2" : ["soil_g2", "temp_g2", "flow_g2"],
 				 "group3" : ["soil_g3", "temp_g3", "flow_g3"],
 				 "group4" : ["soil_g4", "temp_g4", "flow_g4"]}
-	__fileName = os.path.dirname(os.path.realpath(__file__)) + "/datalog.db"
-	__plantTypes = ["Generic", "Weed", "Cannabis", "Marijuana", "Hemp", "Tomato", "Chili pepper"]
+	__fileName = ""
+	__species = ["Generic", "Weed", "Cannabis", "Marijuana", "Hemp", "Tomato", "Chili pepper"]
 	__tables = ["sensorData","sensorSetup","groups","plants","plantTypes","watering"]
 	__views = ["defaultview", "sensorCheck"]
 	__tlock = threading.Lock()
@@ -59,6 +60,7 @@ class Database(object):
 
 	def __init__(self, reset = False):
 
+		self.__fileName = gs.dataloc + "datalog.db"
 		if (reset):
 			self.__dropTables()
 			self.__resetting = True
@@ -68,9 +70,13 @@ class Database(object):
 
 
 	def __setFieldsFromDB(self):
-		
-		query = "SELECT sensorName, sensorType FROM sensorSetup;"
-		self.__fields = self.__dbRead(query)
+		# set planttypes from db.
+		query1 = "SELECT sensorName, sensorType FROM sensorSetup;"
+		query2 = "SELECT species from plantTypes;"
+		self.__plantTypes = []
+		for t in self.__dbRead(query2):
+			self.__species.append(t[0])
+		self.__fields = self.__dbRead(query1)
 
 	def __checkFields(self):
 		"""\t\tRun on boot. Check wether the data format in the DB is the same as
@@ -186,7 +192,7 @@ class Database(object):
 		
 		# Gathering data for plantTypes table...
 		plantTData = []
-		for type in self.__plantTypes:
+		for type in self.__species:
 			plantTData.append("INSERT INTO plantTypes(species) VALUES('{}');".format(type.title()))
 
 		# Creating watering table...
@@ -236,43 +242,35 @@ class Database(object):
 		try:
 			group = int(group)
 		except:
-			group = group[-1]
+			group = int(group[-1])
 		if (not (0 < group <= len(self.__groups))):
 			self.lastResult = False
 			logging.error("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
 			return(False)
-		# Get species ID for given species.
-		dbmsg1 = "SELECT typeID FROM plantTypes WHERE species = '{}';".format(species)
 		# Get info on requested container.
-		dbmsg2 = "SELECT p.name FROM plants AS p LEFT JOIN groups AS g ON p.plantID = g.plantID "
-		dbmsg2 += "WHERE g.groupID = {};".format(group)
-		with (self.__tlock):
-			conn = sql.connect(self.__fileName)
-			with conn:
-				curs = conn.cursor()
-				curs.execute(dbmsg1)
-				sID = curs.fetchone()
-				curs.execute(dbmsg2)
-				curPlant = curs.fetchone()
-				self.__printutf("curPlant:" + str(curPlant))
+		dbmsg1 = "SELECT p.name FROM plants AS p LEFT JOIN groups AS g ON p.plantID = g.plantID "
+		dbmsg1 += "WHERE g.groupID = {};".format(group)
+		curPlant = self.__dbRead(dbmsg1)
+		self.__printutf("curPlant:" + str(curPlant))
 		# Abort if there is already a plant in the requested container
 		if (curPlant is not None):
 			self.lastResult = False
 			logging.error("Plant '{}' is already assigned to container {}.".format(curPlant[0], group))
 			return(False)
 		# If species isn't in the DB yet, add entry
-		if (sID is None):
+		if (not species in self.__species):
 			logging.info("New species. Adding {} to DB...".format(species))
 			self.__addSpecies(species)
-		dbmsg3 = "INSERT INTO plants(name, plantType, datePlanted, groupID) "
-		dbmsg3 += "VALUES('{}', ({}), datetime(), {});".format(name, dbmsg1[:-1], group)
-		dbmsg4 = "UPDATE groups SET plantID = (SELECT max(plantID) FROM plants) WHERE groupID = {};".format(group)
-		self.__dbWrite(dbmsg3, dbmsg4)
+		dbmsg2 = "INSERT INTO plants(name, plantType, datePlanted, groupID) "
+		dbmsg2 += "VALUES('{}', ({}), datetime(), {});".format(name, dbmsg1[:-1], group)
+		dbmsg3 = "UPDATE groups SET plantID = (SELECT max(plantID) FROM plants) WHERE groupID = {};".format(group)
+		self.__dbWrite(dbmsg2, dbmsg3)
 		self.lastResult = True
 		return(True)
 		
 	def __addSpecies(self, species):
 
+		self.__species.append(species)
 		dbmsg = "INSERT INTO plantTypes(species) VALUES('{}');".format(species.title())
 		self.__dbWrite(dbmsg)
 
@@ -419,8 +417,8 @@ class Database(object):
 				names = [names]
 			for n in names:
 				if (n in self.__fields.keys()):
-					sel += ", {}".format()
-			if (len(sel) == 0):
+					sel += ", {}".format(n)
+			if (sel == "timestamp"):
 				return(None)
 		elif (types is not None):
 			if (isinstance(types, str)):
@@ -440,7 +438,7 @@ class Database(object):
 		else:
 			sel = "*"
 		query = "SELECT {} FROM sensorData WHERE timestamp > {} {}".format(sel, st, en)
-		snames = sel.split(",")
+		snames = [sel.split(",")]
 		data = self.__dbRead(query)
 		if (data is None):
 			return(None)
