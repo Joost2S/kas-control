@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.7.8	09-02-2018
+# v0.7.09	11-02-2018
 
 import logging
 import RPi.GPIO as GPIO
@@ -68,7 +68,6 @@ try:
 	monitor.start()
 	gs.draadjes.append(monitor)
 
-	gs.server.makeSocket()
 	gs.server.serverLoop()
 except network.shutdownError:
 	logging.info("Shutdown by client.")

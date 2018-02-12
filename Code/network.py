@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.1.00	10-02-2018
+# v1.1.01	11-02-2018
 
 from abc import ABCMeta, abstractmethod
 import csv
@@ -629,7 +629,7 @@ class set(netCommand):
 	def __init__(self):
 		self.command = "set"
 		self.name = "Set"
-		self.args = "%channel\t'low'\t'high'\t%value"
+		self.args = "%channel\t%trigger\t%value"
 		self.help = "Use this command to set a new value for what moisture level is wanted.\n"
 		self.help += "Arguments:\n"
 		self.help += "%container\t\tNumber of container to change.\n"
@@ -650,6 +650,11 @@ class set(netCommand):
 		lowval = 0
 		if (args is not None):
 			if (len(args) > 0):
+				if (args[0] == "auto"):
+					msg = ""
+					for i in range(gs.control.grouplen()):
+						msg += gs.control.setTriggers("group" + str(i + 1)) + "\n"
+					return(msg)
 				check, chan = self.channelCheck(args[0])
 				if (not check):
 					return(chan)
@@ -672,7 +677,7 @@ class set(netCommand):
 					if (trig == "high"):
 						return(gs.control.setTriggers(chan, high = value))
 				elif (len(args) == 1):
-					return(gs.control.setTriggers(chan, value))
+					return(gs.control.setTriggers(chan))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 
 class get(netCommand):
@@ -952,12 +957,14 @@ class led(netCommand):
 	def runCommand(self, args = None):
 		if (args is not None):
 			try:
-				chan = int(args[0])
-				if (not (1 <= chan <= 4)):
+				if (not (0 < int(args[0]) <= len(gs.powerLEDpins))):
 					raise ValueError
 			except ValueError:
 				return("Please enter valid channel.")
-			gs.control#plcontroller.toggle(chan)
+			if (gs.control.powerLEDtoggle(chan)):
+				return("powerLED on channel {} toggled. State: {}".format(chan, gs.control.powerLEDstate(chan)[0]))
+			else:
+				return("Failed to toggle powerLED on channel {}. State: {}".format(chan, gs.control.powerLEDstate(chan)[0]))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 				
 class stl(netCommand):
@@ -978,14 +985,13 @@ class stl(netCommand):
 		if (args is not None):
 			if (len(args) >= 2):
 				try:
-					chan = int(args[0])
-					if (not (1 <= chan <= 4)):
+					if (not (0 < int(args[0]) <= len(gs.powerLEDpins))):
 						raise ValueError
 				except ValueError:
 					return("Please enter valid channel.")
 				if (args[1] in ["1ww", "3ww", "3ir"]):
-					gs.control#plcontroller.setled(chan, args[1])
-					return("Channel {} set to: '{}'. Now ready to be used.")
+					gs.control.powerLEDset(chan, args[1])
+					return("Channel {} set to: '{}'. Now ready to be used.".format(chan, args[1]))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 	
 class pwr(netCommand):
@@ -1054,6 +1060,7 @@ class Server(object):
 
 	def __init__(self):
 
+		self.__makeSocket()
 		self.clientNr = 1
 		self.commands = {}
 		comms = [ ext(), cur(), tem(),
@@ -1072,7 +1079,7 @@ class Server(object):
 			self.commands[command.command] = command
 		gs.server = self
 
-	def makeSocket(self):
+	def __makeSocket(self):
 		"""Create a network connection to start the server."""
 
 		try:
@@ -1173,7 +1180,7 @@ class Server(object):
 				for item in data[1:]:
 					args.append(str(item).lower())
 				if (command == "help"):
-					args = (self.commands, args[0].lower())
+					args = (self.commands, args[0])
 			elif (command == "help"):
 				args = (self.commands,)
 			try:

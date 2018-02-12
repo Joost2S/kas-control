@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.3.05	10-02-2018
+# v0.3.06	11-02-2018
 
 import calendar
 from datetime import datetime, timedelta
@@ -81,7 +81,7 @@ class Database(object):
 	def __checkFields(self):
 		"""\t\tRun on boot. Check wether the data format in the DB is the same as
 		the sensor setup of the main program.
-		Set plantnames and triggers in gs.control.__groups[] at the end."""
+		Set plantnames and triggers in gs.control.__groups{} at the end."""
 
 		validated = False
 		fields = gs.control.getDBfields()
@@ -121,7 +121,7 @@ class Database(object):
 			self.__setFieldsFromDB()
 			try:
 				self.__checkFields()
-			except:
+			except dbVaildationError:
 				raise dbVaildationError
 			return
 
@@ -517,9 +517,10 @@ class Database(object):
 		print()
 
 	def setInterval(self, interval):
-		"""Set a new interval in minutes."""
+		"""Set a new interval in minutes. Will be rounded down to whole seconds."""
+
 		if (interval >= 1.0):
-			self.__interval = float(interval)
+			self.__interval = int(interval * 60)
 	
 	def getContainerNameTriggers(self, container):
 		"""Returns [plantname, lowtrig, hightrig]"""
@@ -537,13 +538,12 @@ class Database(object):
 		"""This is the main datalogging method. Every %interval minutes the data will be recorded into the database."""
 
 		# Waiting to ensure recordings are synced to __interval
-		timeRes = self.__interval * 60.0
-		while (int(time.time()) % timeRes != timeRes - 1):
+		while (int(time.time()) % self.__interval != self.__interval - 1):
 			time.sleep(1)
 			if (not gs.running):
 				return
 		while(1):
-			if (int(time.time()) % timeRes == 0):
+			if (int(time.time()) % self.__interval == 0):
 				break
 			else:
 				time.sleep(0.01)
@@ -561,13 +561,12 @@ class Database(object):
 				self.__dbWrite(dbmsg)
 
 			# Waiting for next interval of timeRes to start next itertion of loop.
-			timeRes = self.__interval * 60.0
-			while (int(time.time()) % timeRes != timeRes - 1):
+			while (int(time.time()) % self.__interval != self.__interval - 1):
 				time.sleep(1)
 				if (not gs.running):
 					return
 			while(1):
-				if (int(time.time()) % timeRes == 0):
+				if (int(time.time()) % self.__interval == 0):
 					break
 				else:
 					time.sleep(0.01)

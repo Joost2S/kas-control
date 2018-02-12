@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.8.18	10-02-2018
+# v0.8.19	11-02-2018
 
 
 from abc import ABCMeta, abstractmethod
@@ -346,10 +346,16 @@ class fan(object):
 
 
 	def on(self):
+		self.__state = True
 		self.__mcp.output(self.__pin, True)
 
 	def off(self):
+		self.__state = False
 		self.__mcp.output(self.__pin, False)
+
+	def getState(self):
+
+		return(self.__state)
 
 
 class globstuff:

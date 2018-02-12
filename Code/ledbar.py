@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.5.01	10-02-2018
+# v0.5.02	11-02-2018
 
 import logging
 
@@ -11,12 +11,13 @@ class LEDbar(object):
 	
 	__iPins = []			# List with indicator pin numbers
 	__lPins = []			# List with LED pin numbers
-	mode = 0					# Select from bar or dot mode. 0, 1
-	indicator = 0			# Tells user which sensor is displayed from selected range
-	ledAmount = 0			# Amount of leds in bar
+	__mode = 0				# Select from bar or dot mode. 0, 1
+	__indicator = 0		# Tells user which sensor is displayed from selected range
+	__ledAmount = 0		# Amount of leds in bar
 	__curVal = 0			# Current value displayed on LEDbar
+	__names = {}			# {name : bool(displayed), name : bool(displayed),...}
 
-	def __init__(self, pins = [], icount = 0, fromLorR = "r"):
+	def __init__(self, icount = 0, pins = [], fromLorR = "r"):
 		
 		if (len(pins) < 1):
 			raise Exception("No pins are defined for the LEDbar.")
@@ -40,7 +41,9 @@ class LEDbar(object):
 			if (len(names) > (2 ** len(self.__iPins))):
 				names = names[:2 ** len(self.__iPins)]
 				logging.warning("Not enough indicator LEDs are defined. Not all sensors will be displayed.")
-				
+			for n in names:
+				self.__names[n] = moi
+
 	# Used to calculate the correct amount of LEDs to indicate levels,
 	# based on the displayrange and amount of LEDs.
 	def dispLEDs(self, value):

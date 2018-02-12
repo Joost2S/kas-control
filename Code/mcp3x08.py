@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.4.00	09-02-2018
+# v1.4.01	11-02-2018
 
 """
 For controlling MCP3208 and MCP3008 adc for light and moisture readings.
@@ -94,7 +94,7 @@ class MCP3x0x(object):
 		else:
 			logging.debug("Only one flip flop pin given, please give 2 pins for a complete flip-flop circuit.")
 		
-	def getMeasurement(self, name, perc):
+	def getMeasurement(self, name, perc = False):
 		"""Get a reading of soil moisture level."""
 
 		level = 0.0

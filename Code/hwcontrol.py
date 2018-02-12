@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.15	10-02-2018
+# v0.9.16	11-02-2018
 
 import csv
 from datetime import datetime, timedelta
@@ -19,7 +19,7 @@ import hd44780
 import ina219
 import ledbar
 import mcp3x08
-import PowerLEDs
+import powerLEDs
 
 
 class hwControl(object):
@@ -43,6 +43,8 @@ class hwControl(object):
 	__floatSwitch = None		# Reference to floatSwitch object
 	__LCD = None				# Reference to an hd44780 16x02 or 20x04 LCD
 	__LEDbars = []				# Reference to some LEDbars.
+	__fan = None				# Reference to fan object.
+	__fanToggleTemp = 50		# Temoerature at which to turn on fan.
 	__template = ""			# Template for __currentstats
 	__currentstats = ""		# Latest output of the monitor method. Is formatted for display in console.
 	__rawStats = []			# List with the latest results from sensors.
@@ -67,7 +69,9 @@ class hwControl(object):
 		if (gs.hwOptions["lcd"]):
 			self.__LCD = hd44780.Adafruit_CharLCD(gs.LCD_RS, gs.LCD_E, gs.LCD4, gs.LCD5, gs.LCD6, gs.LCD7, *gs.LCD_SIZE, gs.LCD_L)
 		if (gs.hwOptions["powermonitor"]):
-			self.__plcontroller = PowerLEDs.PowerLEDcontroller()
+			self.__plcontroller = powerLEDs.PowerLEDcontroller()
+		if (gs.hwOptions["fan"]):
+			self.__fan = globstuff.fan(gs.fanPin)
 		self.__template = self.__setTemplate()
 		self.setTimeRes()
 		self.__check_connected()
@@ -114,7 +118,18 @@ class hwControl(object):
 					if (type == "temp"):
 						if (name[-2] == "g" and not gs.hwOptions["soiltemp"]):
 							return(None)
-						return(self.__tempMGR.getMeasurement(name))
+						temp = self.__tempMGR.getMeasurement(name)
+						if (name.upper() == "PSU"):
+							if (temp > self.__maxPSUtemp):
+								pass
+								#doEmergencyThing()
+							elif (temp > self.__fanToggleTemp):
+								if (not self.__fan.getState()):
+									self.__fan.on()
+							elif (temp < (self.__fanToggleTemp - 10)):
+								if (self.__fan.getState()):
+									self.__fan.off()
+						return(temp)
 				elif (type == "pwr"):
 					# name = "12vp"
 					if (name[-1] == "p"):
@@ -219,8 +234,12 @@ class hwControl(object):
 				time.sleep(1)
 			self.__lastPowerRequest = time.time()
 			current = self.__ina["12v"].getCurrent()		# get current power draw from the PSU.
-			for c in cur:
-				current += c.power
+			if (isinstance(cur[0])):
+				for c in cur:
+					current += cur[0]
+			else:
+				for c in cur:
+					current += c.power
 			print("Expected power draw: " + str(current) + " mA")
 			if (current > self.__maxPower):
 				return(False)
@@ -418,6 +437,7 @@ class hwControl(object):
 				t = t[:6]
 			lines[currentlines + 1] += "|{}\t".format(t)
 			lines[currentlines + 2] += "|{}\t"
+
 		template = ""
 		for l in lines[:-1]:
 			template += l + "\n"
@@ -470,20 +490,18 @@ class hwControl(object):
 				sdata = []	# Data from the other sensors.
 				for s in self.__otherSensors:
 					if (self.__sensors[s] == "light"):
-						sdata.append(gs.adc.getMeasurement(s, 0))
+						sdata.append(self.requestData(name = s, perc = True))
 					elif (self.__sensors[s] == "temp"):
-						sdata.append(self.__sensors[s][0].getTemp())
-						if (s == "PSU"):
-							if (sdata[-1] > self.__maxPSUtemp):
-								pass
-								#doEmergencyThing()
+						sdata.append(self.requestData(name = s))
 					elif (self.__sensors[s] == "cputemp"):
 						sdata.append(gs.getCPUtemp())
-					elif (self.__sensors[s][1] == "flow"):
-						sdata.append(self.__sensors[s][0].getFlowRate())
+					elif (self.__sensors[s] == "flow"):
+						sdata.append(self.requestData(name = s))
 
 				# Sort data to make it available in raw and formatted forms.
-				data.extend(gn)
+#				data.extend(gn)
+				for m in gm:
+					data.append(self.__perc(m))
 				data.extend(gm)
 				if (gs.hwOptions["soiltemp"]):
 					data.extend(gt)
@@ -521,6 +539,10 @@ class hwControl(object):
 			for t in gs.wtrThreads:
 				t.join()
 			
+	def __perc(self, value, decimals = 1):
+
+		return(round((data * 100) / float(self.__adc.getResolution()), decimals))
+
 	def __check_connected(self):
 		"""Checks and sets wether a sensor is connected to each channel of the ADC."""
 
@@ -533,7 +555,41 @@ class hwControl(object):
 					logging.debug("{} disabled".format(g.groupname))
 				else:
 					logging.debug("{} enabled".format(g.groupname))
-					
+			
+	def powerLEDtoggle(self, channel):
+		
+		if (0 < channel <= len(gs.powerLEDpins)):
+			if (self.__plcontroller.getState(channel)[0]):
+				self.__plcontroller.turnOff(channel)
+				return(True)
+			if (self.__requestPower(self.__plcontroller.getState(channel)[2])):
+				self.__plcontroller.turnOn(channel)
+				return(True)
+		return(False)
+
+	def powerLEDon(self, channel):
+		
+		if (0 < channel <= len(gs.powerLEDpins)):
+			if (self.__requestPower(self.__plcontroller.getState(channel)[2])):
+				self.__plcontroller.turnOn(channel)
+				return(True)
+		return(False)
+
+	def powerLEDoff(self, channel):
+		
+		if (0 < channel <= len(gs.powerLEDpins)):
+			self.__plcontroller.turnOff(channel)
+
+	def powerLEDset(self, channel, mode):
+		
+		if (0 < channel <= len(gs.powerLEDpins)):
+			self.__plcontroller.setLED(channel, mode)
+	
+	def powerLEDstate(self, channel):
+		
+		if (0 < channel <= len(gs.powerLEDpins)):
+			return(self.__plcontroller.getState(channel))
+
 	def setTimeRes(self, time = None):
 		"""
 		Change the interval at which measurements are taken. Interval must be

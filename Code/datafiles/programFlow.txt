@@ -11,7 +11,6 @@
 		- init pump
 		- init float switch
 		- init of 16x02/20x04 LCD
-		- init of LEDbars
 		- read sensorSetup.csv -->
 			- (add name of all sensors to sensors[name] = sensorType)
 			- (add name of sensors not belonging to groups to otherSensors[])
@@ -23,22 +22,25 @@
 			- set moistchannels in adc and add to groups
 			- init groups -->
 				- init associated valve
+			- init of LEDbars
 		- set gs.control to reference to hwcontrol instance
 		
 	- init of database -->
 		- if file doesn't exist yet get fields info from gs.control and create DB 
 		- else get fields info from gs.control and from db and check if datasets match -->
+			- set species list from db
 			- if datasets match, set the plantnames and then trigger levels of groups as recorded in the db
 		- set gs.db to reference to database instance
 	
 	- init of webgraph module -->
 		- set gs.webgraph to reference to webgraph instance
 	- init server -->
+		- setup network connection
+		- init network commands
 		- set gs.server to reference to server instance
 	- init buttons
 	- engage gpio expanders
 	- start db.datalog thread
 	- start monitor thread -->
 		- Blink status LED or turn on LCD backlight to indicate to user the system is online
-	- setup network connection
 	- start serverloop

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.6.01	10-02-2018
+# v0.6.02	11-02-2018
 
 import logging
 import threading
@@ -59,13 +59,14 @@ class Group(object):
 			return(self.mstName)
 
 	def removePlant(self):
-		"""When removing a plant, the channel will be disables until a new plant is entered."""
+		"""When removing a plant, the channel will be disabled until a new plant is entered."""
 
-		self.enabled = False
-		self.lowtrig = 0
-		self.hightrig = 0
-		gs.db.removePlant(self.plantName)
-		self.plantName = None
+		if (self.plantName is not None):
+			self.enabled = False
+			self.lowtrig = 0
+			self.hightrig = 0
+			gs.db.removePlant(self.plantName)
+			self.plantName = None
 
 	def addPlant(self, name, type = None):
 		"""\t\tAdd a plant. Only possible of no plant is currently assigned.
