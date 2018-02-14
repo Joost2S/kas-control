@@ -1,8 +1,9 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.16	11-02-2018
+# v0.9.17	13-02-2018
 
+from collections import OrderedDict
 import csv
 from datetime import datetime, timedelta
 import logging
@@ -29,7 +30,6 @@ class hwControl(object):
 
 	# Lists and dicts for storing sensors and groups 
 	# and accessing them in various ways.
-	__chanlist = []			# Should be removed in future version
 	__groups = {}				# Dict with group instances. {name : group}
 	__sensors = {}				# {name : type}
 	__otherSensors = []		# List of sensor names that are not part of any group.
@@ -74,7 +74,7 @@ class hwControl(object):
 			self.__fan = globstuff.fan(gs.fanPin)
 		self.__template = self.__setTemplate()
 		self.setTimeRes()
-		self.__check_connected()
+		self.__checkConnected()
 		gs.control = self
 
 
@@ -207,11 +207,13 @@ class hwControl(object):
 	
 	def endPumpRequest(self, chan):
 
+		# Checking if any other containers are being watered.
 		i = 0
 		for g in self.__groups.values():
 			if (g.valve.open):
-				if (not self.__groups[chan].valve is g.valve):
+				if (not self.__groups[chan] is g):
 					i += 1
+		# No other containers are being watered, turning off pump.
 		if (i == 0):
 			self.__pump.off()
 			time.sleep(0.1)
@@ -250,6 +252,9 @@ class hwControl(object):
 	def disable(self):
 
 		self.__enabled = False
+		while (self.__pump.isPumping):
+			time.sleep(0.1)
+		self.__pump.off()
 
 	def setTriggers(self, group, low = None, high = None):
 
@@ -302,10 +307,6 @@ class hwControl(object):
 		if (group in self.__groups):
 			return(self.__groups[group].getName())
 		return(None)
-
-	def getDBfields(self):
-
-		return
 
 	def setPlantsAndTriggers(self):
 
@@ -376,19 +377,17 @@ class hwControl(object):
 							mname = "soil-g" + i
 							tname = None
 							fname = None
-							if (gs.hwOptions["soiltemp"] and tdev is not None):
-								tname = "temp-g" + i
-							if (gs.hwOptions["flowSensors"]):
-								fname = "flow-g" + i
 							mst = self.__setSoilSensor(mstname, output[3], output[2], output[1])
 							if (gs.hwOptions["soiltemp"] and tdev is not None):
+								tname = "temp-g" + i
 								self.__sensors[tname] = "temp"
 								self.__tempMGR.setDev(tname, tdev)
-							if (gs.hwOptions["flowSensors"]):
+							if (gs.hwOptions["flowSensors"] and output[4] != "None"):
+								fname = "flow-g" + i
 								self.__sensors[fname] = "flow"
 								self.__flowSensors[fname] = flowsensor.flowMeter(output[4])
 							self.__groups[name] = group.Group(name, mname, tname, fname, output[0])
-							self.__chanlist.append(name)
+		self.__sensors = OrderedDict(self.__sensors.items())
 
 	def __setSoilSensor(self, name, channel, ff1, ff2):
 
@@ -403,7 +402,8 @@ class hwControl(object):
 		self.__ina[output[0]].setConfig(int(output[3]), int(output[4]), int(output[5]), int(output[6]))
 		self.__ina[output[0]].setCalibration(int(output[7]), float(output[8]))
 		self.__ina[output[0]].engage()
-		self.__sensors[output[0]] = "pwr"
+		self.__sensors[output[0] + "v"] = "pwr"
+		self.__sensors[output[0] + "c"] = "pwr"
 		
 	def __setTemplate(self):
 		"""Generates the template for the formatted currentstats."""
@@ -426,10 +426,16 @@ class hwControl(object):
 		lines.append("")
 		currentlines = len(lines)
 		lines.append("Light:\tTemps:")
-		for t in self.__otherSensors:
-			if (self.__sensors[t][1] == "temp"):
-				lines[currentlines + 0] += "\t"
-		lines[currentlines + 0] += "Water:"
+		if (gs.hwOptions[""]):
+			for t in self.__otherSensors:
+				if (self.__sensors[t] == "temp" or self.__sensors[t] == "cputemp"):
+					lines[currentlines + 0] += "\t"
+			lines[currentlines + 0] += "Water:"
+		if (gs.hwOptions[""]):
+			for t in self.__otherSensors:
+				if (self.__sensors[t] == "flow"):
+					lines[currentlines + 0] += "\t"
+			lines[currentlines + 0] += "Power:"
 		lines.append("")
 		lines.append("")
 		for t in self.__otherSensors:
@@ -439,9 +445,9 @@ class hwControl(object):
 			lines[currentlines + 2] += "|{}\t"
 
 		template = ""
-		for l in lines[:-1]:
+		for l in lines:
 			template += l + "\n"
-		return(template + lines[-1])
+		return(template + "\n")
 
 	def monitor(self):
 		"""\t\tMain monitoring method. Will check on the status of all sensors every %timeRes seconds.
@@ -518,7 +524,7 @@ class hwControl(object):
 					pass
 				if (gs.hwOptions["ledbars"]):
 					self.__LEDbars["mst"].updateBar(gn, gm)
-					self.__LEDbars["teps"].updateBar()
+					self.__LEDbars["temps"].updateBar()
 				print(self.__currentstats)
 
 				# Waiting for next interval of timeRes to start next itertion of loop.
@@ -543,7 +549,7 @@ class hwControl(object):
 
 		return(round((data * 100) / float(self.__adc.getResolution()), decimals))
 
-	def __check_connected(self):
+	def __checkConnected(self):
 		"""Checks and sets wether a sensor is connected to each channel of the ADC."""
 
 		for g in self.__groups.values():
@@ -620,13 +626,36 @@ class hwControl(object):
 
 		data = {}
 		for n, g in self.__groups.items():
-			names = [g.mstName]
+			names = [g.mstName.replace("-", "_")]
 			if (gs.hwOptions["soiltemp"] and g.tempName is not None):
-				names.append(g.tempName)
+				names.append(g.tempName.replace("-", "_"))
 			if (gs.hwOptions["flowsensors"] and g.flowName is not None):
-				names.append(g.flowName)
+				names.append(g.flowName.replace("-", "_"))
+			# SQLite3 doesn't support dashes (-) in column names, so replace with underscore (_).
 			data[n] = names
 		return(data)
+	
+	def getDBsensors(self):
+
+		sensors = OrderedDict()
+		for s, t in self.__sensors.keys():
+			sensors[s.replace("-", "_")] = t
+		return(sensors)
+
+	def getDBcheckData(self):
+
+		groups = {}
+		for name, g in self.getDBgroups().values():
+			for sensor in g:
+				groups[sensor] = name
+		dbCheckData = []
+		for i, s, t in enumerate(OrderedDict(sorted(self.__sensors.items()))):
+			dbCheckData.append([s.replace("-", "_"), t, None, None])
+			if (t == "mst" or t == "light"):
+				dbCheckData[i][3] = self.getADCres()
+			if (s in groups):
+				dbCheckData[i][2] = groups[s]
+		return(dbCheckData)
 
 	def getADCres(self):
 

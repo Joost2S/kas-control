@@ -1,12 +1,13 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.6.02	11-02-2018
+# v0.6.03	13-02-2018
 
 import logging
 import threading
 import time
 
+import globstuff
 from globstuff import globstuff as gs
 
 class Group(object):
@@ -58,25 +59,6 @@ class Group(object):
 		else:
 			return(self.mstName)
 
-	def removePlant(self):
-		"""When removing a plant, the channel will be disabled until a new plant is entered."""
-
-		if (self.plantName is not None):
-			self.enabled = False
-			self.lowtrig = 0
-			self.hightrig = 0
-			gs.db.removePlant(self.plantName)
-			self.plantName = None
-
-	def addPlant(self, name, type = None):
-		"""\t\tAdd a plant. Only possible of no plant is currently assigned.
-		Channel will be enabled when new trigger levels are set."""
-
-		if (not self.enabled and self.plantName == None):
-			name = str(name).title()
-			gs.db.addplant(name, type)
-			self.plantName = name
-			
 	def getM(self):
 		"""Returns the soil moisture level of the associated sensor."""
 
@@ -113,7 +95,26 @@ class Group(object):
 		if (not self.connected):
 			return("N/C")
 		return(self.flowName.getFlowRate())
+	
+	def removePlant(self):
+		"""When removing a plant, the channel will be disabled until a new plant is entered."""
 
+		if (self.plantName is not None):
+			self.enabled = False
+			self.lowtrig = 0
+			self.hightrig = 0
+			gs.db.removePlant(self.plantName)
+			self.plantName = None
+
+	def addPlant(self, name, type = None):
+		"""\t\tAdd a plant. Only possible of no plant is currently assigned.
+		Channel will be enabled when new trigger levels are set."""
+
+		if (not self.enabled and self.plantName == None):
+			name = str(name).title()
+			gs.db.addplant(name, type)
+			self.plantName = name
+			
 	def setTriggers(self, lt = None, ht = None):
 		"""If levels set below threshlod, container will be disabled."""
 

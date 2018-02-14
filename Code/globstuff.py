@@ -162,7 +162,7 @@ class floatUp(object):
 					server.quit()
 					logging.debug("Sent mail to " + toaddr)
 					
-	def check_level(self):
+	def checkLevel(self):
 		"""\t\tRun as seperate thread when a low water level situation occurs.
 		Will self terminate when the water level is high enough again."""
 
@@ -215,7 +215,7 @@ class lowWater(protoThread):
 
 	def run(self):
 		logging.info("Starting thread{0}: {1}".format(self.threadID, self.name))
-		globstuff.fltdev.check_level()
+		globstuff.fltdev.checkLevel()
 		logging.info("Exiting thread{0}: {1}".format(self.threadID, self.name))
 		
 
@@ -505,7 +505,7 @@ class globstuff:
 
 		print("Shutting down system.")
 		globstuff.running = False
-		globstuff.pump.disable()
+		globstuff.control.disable()
 		globstuff.db.running = False
 		for t in globstuff.draadjes:
 				t.join()

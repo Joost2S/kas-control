@@ -1,9 +1,10 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.3.06	11-02-2018
+# v0.3.07	13-02-2018
 
 import calendar
+from collections import OrderedDict
 from datetime import datetime, timedelta
 import logging
 import os
@@ -21,13 +22,15 @@ gs = globstuff.globstuff
 class Database(object):
 	
 	__allowedTypes = ["mst", "light", "flow", "temp", "cputemp", "pwr"]
-	__fields = {"ambientl" : "light",
+	__sensors = {"ambientl" : "light",
 				 "ambientt" : "temp",
 				 "out_sun" : "temp",
 				 "out_shade" : "temp",
 				 "PSU" : "temp",
 				 "CPU" : "cputemp",
 				 "totalw" : "flow",
+				 "12vc" : "pwr",
+				 "12vv" : "pwr",
 				 "soil_g1" : "mst",
 				 "soil_g2" : "mst",
 				 "soil_g3" : "mst",
@@ -50,7 +53,7 @@ class Database(object):
 	__views = ["defaultview", "sensorCheck"]
 	__tlock = threading.Lock()
 	__resetting = False
-	__interval = 5.0						# Record sensor data every x min
+	__interval = 300						# By default, record sensor data every 5 minutes.
 	pause = False
 
 
@@ -64,6 +67,7 @@ class Database(object):
 		if (reset):
 			self.__dropTables()
 			self.__resetting = True
+		self.__sensors = gs.control.getDBsensors()
 		self.__groups = gs.control.getDBgroups()
 		self.__createdb()
 		gs.db = self
@@ -84,8 +88,10 @@ class Database(object):
 		Set plantnames and triggers in gs.control.__groups{} at the end."""
 
 		validated = False
-		fields = gs.control.getDBfields()
-		# Maybe implement an integrity check sometime so this check can actually complete succesfully.
+		query = "SELECT * FROM sensorCheck ORDER BY sensorName ASC;"
+		dbdata = self.__dbRead(query)
+		if (dbdata == gs.control.getDBcheckData()):
+			validated = True
 		if (validated):
 			gs.control.setPlantsAndTriggers()
 		else:
@@ -131,7 +137,7 @@ class Database(object):
 
 		# Creating sensorData table...
 		sensorData = "CREATE TABLE sensorData (timestamp DATETIME NOT NULL"
-		for fn, ft in self.__fields.items():
+		for fn, ft in self.__sensors.items():
 			sensorData += ", " + fn
 			if (ft in self.__allowedTypes[:3]):
 				sensorData += " REAL"
@@ -150,7 +156,7 @@ class Database(object):
 			
 		# Gathering data for sensorSetup table...
 		sensorSData = []
-		for i, fn, ft in enumerate(self.__fields.items()):
+		for i, fn, ft in enumerate(self.__sensors.items()):
 			subquery = "NULL"
 			res = "NULL"
 			if (ft == "mst" or ft == "light"):
@@ -416,7 +422,7 @@ class Database(object):
 			if (isinstance(names, str)):
 				names = [names]
 			for n in names:
-				if (n in self.__fields.keys()):
+				if (n in self.__sensors.keys()):
 					sel += ", {}".format(n)
 			if (sel == "timestamp"):
 				return(None)
@@ -424,7 +430,7 @@ class Database(object):
 			if (isinstance(types, str)):
 				types = [types]
 			for t in types:
-				for fn, ft in self.__fields.items():
+				for fn, ft in self.__sensors.items():
 					if (ft == t):
 						sel += ", {}".format(fn)
 			if (len(sel) == 0):
@@ -554,9 +560,9 @@ class Database(object):
 				start = time.time()
 				txt1 = "INSERT INTO sensorData(timestamp"
 				txt2 = ")VALUES({}".format(int(time.time()))
-				for n, f in self.__fields.items():
+				for n in self.__sensors.keys():
 					txt1 += ", " + str(n)
-					txt2 += ", " + str(self.__getValue(f))
+					txt2 += ", " + str(self.__getValue(n))
 				dbmsg += (");")
 				self.__dbWrite(dbmsg)
 

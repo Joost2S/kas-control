@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.1.01	11-02-2018
+# v1.1.02	13-02-2018
 
 from abc import ABCMeta, abstractmethod
 import csv
@@ -435,9 +435,9 @@ class vts(netCommand):
 		self.help = "Can be used to test the valves. Only works if system is in testmode."
 		self.help += "Arguments:\n"
 		self.help += "None\tCycle through all valves.\n"
-		self.help += "%valve%\tEnter the number of the valve to test. (1 - {0})\n".format(str(len(gs.ch_list)))
+		self.help += "%container%\tEnter the container number of the valve to test. (1 - {0})\n".format(str(gs.control.grouplen()))
 		self.help += "%time%\tEnter the time in seconds (max 60) to leave the valve open.\n"
-		self.help += "\tOnly works if a valvenumber has been entered. If not entered, 5 will be used."
+		self.help += "\tOnly works if a container number has been entered. If not entered, 5 will be used.\n"
 
 	def runCommand(self, args = None):
 		if (gs.testmode):
@@ -474,13 +474,13 @@ class wts(netCommand):
 	def __init__(self):
 		self.command = "wtest"
 		self.name = "Water test"
-		self.args = "%channels%\t%time%"
+		self.args = "%container(s)%\t%time%"
 		self.help = "Use this to test the watering system.\n"
 		self.help += "The test has 2 components: First, water is given on all entered channels.\n"
 		self.help += "Second, water is given 1 channel at a time.\n\n"
 		self.help += "Arguments:\n"
-		self.help += "channels:\tEnter the number of the channel(s) you want. 'all' for all available channels.\n"
-		self.help += "time:\tThe last argument given is assumed to be the time. Default time is 5 seconds.\n"
+		self.help += "%channel(s)%:\tEnter the number of the channel(s) you want. 'all' for all available channels.\n"
+		self.help += "%time%:\tThe last argument given is assumed to be the time. Default time is 5 seconds.\n"
 
 	def runCommand(self, args = None):
 		if (gs.testmode):
@@ -534,12 +534,12 @@ class tsm(netCommand):
 		if (args is not None):
 			if (args[0] == "on"):
 				gs.testmode = True
-				gs.pump.disable()
+				gs.control.disable()
 				gs.db.pauze = True
 				return("Testmode enabled.")
 			elif (args[0] == "off"):
 				gs.testmode = False
-				gs.pump.enable()
+				gs.control.enable()
 				gs.db.pauze = False
 				return("Testmode disabled.")
 			return("Please specify 'on' or 'off'.")
