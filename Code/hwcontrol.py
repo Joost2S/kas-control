@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.17	13-02-2018
+# v0.9.18	14-02-2018
 
 from collections import OrderedDict
 import csv
@@ -24,8 +24,9 @@ import powerLEDs
 
 
 class hwControl(object):
-	"""\tObject handling the sensor inputs and taking appropriate hardware actions
-	like watering, and making sensordata available to outputs (console/network/display).
+	"""
+	Main object for interacting with the hardware and taking appropriate actions
+	like watering, and making sensordata available to outputs (console/network/display/ledbar).
 	"""
 
 	# Lists and dicts for storing sensors and groups 
@@ -205,13 +206,14 @@ class hwControl(object):
 					break
 			self.endPumpRequest(name)
 	
-	def endPumpRequest(self, chan):
+	def endPumpRequest(self, group):
+		"""Turn off watering container."""
 
 		# Checking if any other containers are being watered.
 		i = 0
 		for g in self.__groups.values():
 			if (g.valve.open):
-				if (not self.__groups[chan] is g):
+				if (not self.__groups[group] is g):
 					i += 1
 		# No other containers are being watered, turning off pump.
 		if (i == 0):
@@ -220,15 +222,19 @@ class hwControl(object):
 		self.valves[chan].off()
 			
 	def __chekPumpAvail(self, *cur):
-		"""Add calendar function."""
+		"""Use this to check if the pump is available for use."""
 
+		# Add calendar function.
 		if (not self.__pump.enabled):
 			return(False, "Pump is currently disabled.")
 		if (not self.__requestPower(cur)):
 			return(False, "Not enough power available.")
+		if (self.__floatSwitch.getStatus() and gs.hwOptions["floatswitch"]):
+			return("Not enough water in the container.")
 		return(True, "All good.")
 
 	def __requestPower(self, *cur):
+		"""Use this method to check if enough power is available for the requested action."""
 
 		if (gs.hwOptions["powermonitor"]):
 			# There is a delay of a second so the effects of the last request can be noticed.
@@ -257,6 +263,7 @@ class hwControl(object):
 		self.__pump.off()
 
 	def setTriggers(self, group, low = None, high = None):
+		"""Set 1 or both trigger levels for a container. Will be checked for valid values."""
 
 		#Getting a base 10 value instead of a base 2 value:
 		upperthreshold = self.getADCres() - (self.getADCres() % 1000)
@@ -287,12 +294,14 @@ class hwControl(object):
 		return("New value of trigger: {}, {}".format(self.__groups[group].lowtrig, self.__groups[group].hightrig))
 
 	def getTriggers(self, group):
+		"""Set a new trigger level for a container."""
 		
 		if (group in self.__groups):
 			return(self.__groups[group].lowtrig, self.__groups[group].hightrig)
 		return(None, None)
 
 	def addPlant(self, group, name, species = None):
+		"""Add a plant to a container. If a new species is added, it will be added to the database."""
 
 		if (group in self.__groups):
 			if (self.__groups[group].getName() == group):
@@ -303,17 +312,20 @@ class hwControl(object):
 		return("Invalid group.")
 
 	def getGroupName(self, group):
+		"""Returns the groupname or plantname if available."""
 
 		if (group in self.__groups):
 			return(self.__groups[group].getName())
 		return(None)
 
 	def setPlantsAndTriggers(self):
+		"""Trigger each group to retrieve data from the database and activate if appropriate."""
 
 		for g in self.__groups.values():
 			g.setFromDB()
 
 	def __setDataFromFile(self):
+		"""Sets all the sensors as defined in the sensors setup file."""
 		
 		tempAddresses = self.__tempMGR.getTdevList()
 		types = ["temp", "cputemp", "light", "flow", "pwr", "ledbar", "group"]
@@ -390,6 +402,7 @@ class hwControl(object):
 		self.__sensors = OrderedDict(self.__sensors.items())
 
 	def __setSoilSensor(self, name, channel, ff1, ff2):
+		"""Set the flip-flop pins and ADC channel for the container moisture sensor."""
 
 		gs.getPinDev(ff1).setPin(gs.getPinNr(ff1), False)
 		gs.getPinDev(ff2).setPin(gs.getPinNr(ff2), False)
@@ -398,6 +411,8 @@ class hwControl(object):
 		return(name)
 
 	def __setINA219dev(self, output):
+		"""Set the registers of the INA219 device and add voltage and current to sensors."""
+
 		self.__ina[output[0]] = ina219.INA219(int(output[1]), int(output[2]))
 		self.__ina[output[0]].setConfig(int(output[3]), int(output[4]), int(output[5]), int(output[6]))
 		self.__ina[output[0]].setCalibration(int(output[7]), float(output[8]))
@@ -546,6 +561,7 @@ class hwControl(object):
 				t.join()
 			
 	def __perc(self, value, decimals = 1):
+		"""Returns the value as percentage of the ADC resolution."""
 
 		return(round((data * 100) / float(self.__adc.getResolution()), decimals))
 
@@ -563,7 +579,8 @@ class hwControl(object):
 					logging.debug("{} enabled".format(g.groupname))
 			
 	def powerLEDtoggle(self, channel):
-		
+		"""Toggle powerLED channel. Can only turn on if channel is set."""
+
 		if (0 < channel <= len(gs.powerLEDpins)):
 			if (self.__plcontroller.getState(channel)[0]):
 				self.__plcontroller.turnOff(channel)
@@ -574,7 +591,8 @@ class hwControl(object):
 		return(False)
 
 	def powerLEDon(self, channel):
-		
+		"""Turn on powerLED channel. Only possible if set."""
+
 		if (0 < channel <= len(gs.powerLEDpins)):
 			if (self.__requestPower(self.__plcontroller.getState(channel)[2])):
 				self.__plcontroller.turnOn(channel)
@@ -582,17 +600,20 @@ class hwControl(object):
 		return(False)
 
 	def powerLEDoff(self, channel):
-		
+		"""Turn off powerLED channel."""
+
 		if (0 < channel <= len(gs.powerLEDpins)):
 			self.__plcontroller.turnOff(channel)
 
 	def powerLEDset(self, channel, mode):
+		"""Set powerLED channel to mode: '1ww', '3ww', '3ir' to enable channel."""
 		
 		if (0 < channel <= len(gs.powerLEDpins)):
 			self.__plcontroller.setLED(channel, mode)
 	
 	def powerLEDstate(self, channel):
-		
+		"""Returns state, mode and power of the powerLEDchannel."""
+
 		if (0 < channel <= len(gs.powerLEDpins)):
 			return(self.__plcontroller.getState(channel))
 
@@ -618,6 +639,7 @@ class hwControl(object):
 				self.__timeRes = float(time)
 			
 	def isPumpEnabled(self):
+		"""Returns pump availability"""
 
 		return(self.__pump.enabled)
 
@@ -636,6 +658,7 @@ class hwControl(object):
 		return(data)
 	
 	def getDBsensors(self):
+		"""Data for setting up database."""
 
 		sensors = OrderedDict()
 		for s, t in self.__sensors.keys():
@@ -643,6 +666,7 @@ class hwControl(object):
 		return(sensors)
 
 	def getDBcheckData(self):
+		"""Returns a table to be compared with the sensor setup in the database as integrity check."""
 
 		groups = {}
 		for name, g in self.getDBgroups().values():
@@ -658,6 +682,7 @@ class hwControl(object):
 		return(dbCheckData)
 
 	def getADCres(self):
+		"""Returns the resultion of the installed ADC."""
 
 		return(self.__adc.getResolution())
 
@@ -667,19 +692,23 @@ class hwControl(object):
 		return(len(self.__groups))
 
 	def connCheckValue(self):
+		"""Returns the value below which a soil moisture sensor is considered disconnected."""
 
 		return(self.__connectedCheckValue)
 
 	def toggleSpoof(self):
+		"""Toggle betweens real sensor data or algorithmically generated data."""
 
 		self.__spoof = not self.__spoof
 		return(self.__spoof)
 
 	def __getSpoofData(self, type = None, name = None, caller = None):
+		"""Returns fake sensor data generated by excessively advanced algorithms."""
 
 		return("Stuff.")
 
 	def shutdown(self):
+		"""Reset and turn off all in- and outputs when shutting down the system."""
 
 		self.__statusLED.off()
 		self.__pump.disable()

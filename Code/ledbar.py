@@ -44,9 +44,10 @@ class LEDbar(object):
 			for n in names:
 				self.__names[n] = moi
 
-	# Used to calculate the correct amount of LEDs to indicate levels,
-	# based on the displayrange and amount of LEDs.
 	def dispLEDs(self, value):
+		"""Used to calculate the correct amount of LEDs to indicate levels,
+		based on the displayrange and amount of LEDs."""
+
 		perStep = (self.rangeUpper - self.rangeLower) / (len(self.lsta) + len(self.lstb) - 1)
 		amount = value - self.rangeLower
 		if (amount <= 0):
