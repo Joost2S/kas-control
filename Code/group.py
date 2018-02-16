@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.6.03	13-02-2018
+# v0.6.04	15-02-2018
 
 import logging
 import threading
@@ -103,8 +103,9 @@ class Group(object):
 			self.enabled = False
 			self.lowtrig = 0
 			self.hightrig = 0
-			gs.db.removePlant(self.plantName)
+			result = gs.db.removePlant(self.plantName)
 			self.plantName = None
+			return(result)
 
 	def addPlant(self, name, type = None):
 		"""\t\tAdd a plant. Only possible of no plant is currently assigned.
@@ -112,7 +113,7 @@ class Group(object):
 
 		if (not self.enabled and self.plantName == None):
 			name = str(name).title()
-			gs.db.addplant(name, type)
+			gs.db.addPlant(name, self.groupname, type)
 			self.plantName = name
 			
 	def setTriggers(self, lt = None, ht = None):
@@ -133,6 +134,8 @@ class Group(object):
 			if (gs.control.connCheckValue() <= self.lowtrig < self.hightrig):
 				self.enabled = True
 				gs.db.setTriggers(self.chan, self.lowtrig, self.hightrig)
+				if (gs.hwOptions["ledbars"]):
+					self.__LEDbars["mst"].updateBounds(self.mstName, self.lowtrig, self.hightrig)
 			else:
 				self.enabled = False
 

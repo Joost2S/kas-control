@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.18	14-02-2018
+# v0.9.19	15-02-2018
 
 from collections import OrderedDict
 import csv
@@ -43,7 +43,7 @@ class hwControl(object):
 	__pump = None				# Reference to pump object.
 	__floatSwitch = None		# Reference to floatSwitch object
 	__LCD = None				# Reference to an hd44780 16x02 or 20x04 LCD
-	__LEDbars = []				# Reference to some LEDbars.
+	__LEDbars = {}				# Reference to some LEDbars.
 	__fan = None				# Reference to fan object.
 	__fanToggleTemp = 50		# Temoerature at which to turn on fan.
 	__template = ""			# Template for __currentstats
@@ -305,11 +305,16 @@ class hwControl(object):
 
 		if (group in self.__groups):
 			if (self.__groups[group].getName() == group):
-				if(gs.db.addplant(name, group, species)):
+				if(self.__groups[group].addPlant(name, group, species)):
 					return("Added plant {} to container {}.".format(name.title(), group[-1]))
 				return("Error trying to add plant. Check log for details.")
 			return("Can't add new plant. Plant {} is already assigned to container {}.".format(self.__groups[group].getName(), group[-1]))
 		return("Invalid group.")
+
+	def removePlant(self, group):
+		
+		if (group in self.__groups):
+			return(self.__groups[group].removePlant(group))
 
 	def getGroupName(self, group):
 		"""Returns the groupname or plantname if available."""
@@ -373,7 +378,7 @@ class hwControl(object):
 								self.__sensors[output[0]] = curType
 								self.__adc.setChannel(output[0], output[1])
 							elif (curType == "flow" and gs.hwOptions["flowsensors"]):
-								self.__flowSensors["flow-g" + i] = flowsensor.flowMeter(output[1])
+								self.__flowSensors[output[0]] = flowsensor.flowMeter(output[1])
 							elif (curType == "pwr" and gs.hwOptions["powermonitor"]):
 								self.__setINA219dev(output)
 							self.__otherSensors.append(output[0])
@@ -464,7 +469,19 @@ class hwControl(object):
 			template += l + "\n"
 		return(template + "\n")
 
-	def monitor(self):
+	def startMonitor(self):
+		"""Use this function to start monitor to prevent more than 1 instance running at a time."""
+
+		for t in gs.draadjes:
+			if (t.name == "Monitor" and t.is_alive()):
+				return
+
+		#	Start monitoring the soil and other sensors.
+		monitor = Monitor(gs.getThreadNr(), "Monitor", self)
+		monitor.start()
+		gs.draadjes.append(monitor)
+
+	def _monitor(self):
 		"""\t\tMain monitoring method. Will check on the status of all sensors every %timeRes seconds.
 		Will also start methods/actions based on the sensor input."""
 
@@ -697,7 +714,7 @@ class hwControl(object):
 		return(self.__connectedCheckValue)
 
 	def toggleSpoof(self):
-		"""Toggle betweens real sensor data or algorithmically generated data."""
+		"""Toggle between real sensor data or algorithmically generated data."""
 
 		self.__spoof = not self.__spoof
 		return(self.__spoof)
@@ -718,3 +735,10 @@ class hwControl(object):
 		# reset INA219 devices if option.
 		# Turn off LCD if option.
 		# Turn off status LED if option.
+
+
+class Monitor(globstuff.protoThread):
+	def run(self):
+		logging.info("Starting thread{0}: {1}".format(self.threadID, self.name))
+		self.args._monitor()
+		logging.info("Exiting thread{0}: {1}".format(self.threadID, self.name))

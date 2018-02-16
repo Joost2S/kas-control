@@ -1,22 +1,19 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.3.07	13-02-2018
+# v0.4.00	15-02-2018
 
-import calendar
 from collections import OrderedDict
 from datetime import datetime, timedelta
 import logging
 import os
-import random
-import re
 import sqlite3 as sql
 import sys
 import threading
 import time
 
 import globstuff
-gs = globstuff.globstuff
+from globstuff import globstuff as gs
 
 	
 class Database(object):
@@ -231,7 +228,7 @@ class Database(object):
 							plants, plantTypes, plantTData, watering,
 							defaultview, sensorCheck)
 		
-	def addplant(self, name, group, species = None):
+	def addPlant(self, name, group, species = None):
 		"""
 		Use this method when adding a new plant to a container.
 		If a plant is already assigned to the specified container,
@@ -326,6 +323,7 @@ class Database(object):
 		# Change dateRemoved in table plants
 		dbmsg3 = "UPDATE plants SET dateRemoved = date() WHERE plantID = {};".format(pID)
 		self.__dbWrite(dbmsg2, dbmsg3)
+		return(True)
 
 	def wateringEvent(self, group, start, end, amount):
 		"""
@@ -483,21 +481,21 @@ class Database(object):
 
 		sortedmsgs = self.__sortmsgs(*dbmsgs)
 
-#		try:
-		updRows = 0
-		with (self.__tlock):
-			conn = sql.connect(self.__fileName)
-			with conn:
-				curs = conn.cursor()
-				for dbmsg in sortedmsgs:
-#					self.printutf(dbmsg)
-					curs.execute(dbmsg)
-				conn.commit()
-				updRows = curs.rowcount
-		if (updRows > 1):
-			print("updRows:", updRows)
-#		except sql.Error as er:
-#			 print ("er:", er.message)
+		try:
+			updRows = 0
+			with (self.__tlock):
+				conn = sql.connect(self.__fileName)
+				with conn:
+					curs = conn.cursor()
+					for dbmsg in sortedmsgs:
+						curs.execute(dbmsg)
+					conn.commit()
+					updRows = curs.rowcount
+			if (updRows > 1):
+				print("updRows:", updRows)
+		except sql.Error as er:
+			 logging.debug("er:", er.message)
+			 return(0)
 		return(updRows)
 		
 	def __sortmsgs(self, *dbmsgs):
@@ -540,7 +538,19 @@ class Database(object):
 			return(data)
 		return(data[0])
 
-	def datalog(self):
+	def startDatalog(self):
+		"""Use this function to start datalog to prevent more than 1 instance running at a time."""
+		
+		for t in gs.draadjes:
+			if (t.name == "Datalog" and t.is_alive()):
+				return
+
+		#	 Start recording the sensor data to the DB.
+		datalog = Datalog(gs.getThreadNr(), "Datalog", self)
+		datalog.start()
+		gs.draadjes.append(datalog)
+
+	def _datalog(self):
 		"""This is the main datalogging method. Every %interval minutes the data will be recorded into the database."""
 
 		# Waiting to ensure recordings are synced to __interval
@@ -588,6 +598,20 @@ class Database(object):
 		return("NULL")
 		
 	
+class Datalog(globstuff.protoThread):
+	def run(self):
+		logging.info("Starting thread{0}: {1}".format(self.threadID, self.name))
+		try:
+			self.args._datalog()
+		except database.dbVaildationError:
+			pass
+		except:
+			logging.error("Error occured in datalog")
+			self.run()
+		finally:
+			logging.info("Exiting thread{0}: {1}".format(self.threadID, self.name))
+	
+
 class dbVaildationError(Exception):
 	pass
 
@@ -605,42 +629,42 @@ if __name__ == "__main__":
 	print()
 	db = Database(reset = True)
 	
-	db.addplant("plaNT", 1)
+	db.addPlant("plaNT", 1)
 	for i in range(25):
 		wtrEvent(1)
-	db.addplant("haze", 2, "Weed")
+	db.addPlant("haze", 2, "Weed")
 	
 	for i in range(25):
 		wtrEvent(2)
-	db.addplant("chili", 1, "Chili pepper")
-	db.addplant("White Widow", 4, "Weed")
+	db.addPlant("chili", 1, "Chili pepper")
+	db.addPlant("White Widow", 4, "Weed")
 	for i in range(25):
 		wtrEvent(4)
-	db.addplant("Pumpkin", 3, "PumPKin")
-	db.addplant("Tomato", 2, "Tomato")
+	db.addPlant("Pumpkin", 3, "PumPKin")
+	db.addPlant("Tomato", 2, "Tomato")
 	db.removePlant("moi")
 	db.removePlant("plant")
 	db.removePlant("plant")
-	db.addplant("NoRthern LIghts", 1, "WeED")
+	db.addPlant("NoRthern LIghts", 1, "WeED")
 	db.removePlant("TomatO")
-	db.addplant("chili", 2, "Chili pepper")
+	db.addPlant("chili", 2, "Chili pepper")
 	db.removePlant("haze")
-	db.addplant("Tomato", 2, "Tomato")
+	db.addPlant("Tomato", 2, "Tomato")
 	db.removePlant(4)
 	db.removePlant("WhitE wIDow")
 	a = "JalapeÑo"
-	db.addplant(a, 4, "Chili pepper")
+	db.addPlant(a, 4, "Chili pepper")
 	db.removePlant(2)
-	db.addplant("drakenboompje", 2, "TREE")
+	db.addPlant("drakenboompje", 2, "TREE")
 	for i in range(-4, 6):
-		db.addplant("tomATO", i, "TOMato")
+		db.addPlant("tomATO", i, "TOMato")
 	db.removePlant(1)
-	db.addplant("I am with stupid -->", 1, "I AM LEGEND!!!!111!!11oneoneone!1one11one")
+	db.addPlant("I am with stupid -->", 1, "I AM LEGEND!!!!111!!11oneoneone!1one11one")
 	for i in range(25):
 		wtrEvent(1)
 		wtrEvent(3)
 	db.removePlant(1)
-	db.addplant("Kush", 1, "WeeD")
+	db.addPlant("Kush", 1, "WeeD")
 	for i in range(25):
 		wtrEvent(1)
 	db.removePlant("drakenboompjE")
@@ -652,11 +676,11 @@ if __name__ == "__main__":
 		db.getTriggers("group" + str(i + 1))
 	for i in range(25):
 		wtrEvent(2)
-	db.addplant("NuMex Twilight", 2, "Chili pepper")
+	db.addPlant("NuMex Twilight", 2, "Chili pepper")
 	for i in range(25):
 		wtrEvent(2)
 	db.removePlant("pumpkin")
-	db.addplant("frisian dew", 3, "WEED")
+	db.addPlant("frisian dew", 3, "WEED")
 	db.setTriggers(3, 3000 + random.random() * 100, 3500 + random.random() * 100)
 	
 	db.getData()

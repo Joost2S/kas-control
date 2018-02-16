@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.1.02	13-02-2018
+# v1.1.03	15-02-2018
 
 from abc import ABCMeta, abstractmethod
 import csv
@@ -884,7 +884,13 @@ class adp(netCommand):
 		self.command = "addplant"
 		self.name = "Add plant"
 		self.args = "%container\t%plantName\t%plantType%"
-		self.help  = ""
+		self.help  = "Add a plant by name to a container to set the system up\n"
+		self.help += "to water that container. When the plantname is set, the trigger values must be set.\n"
+		self.help += "Arguments:\n"
+		self.help += "%container:\tThe number of the container. 1 - {}\n".format(gs.control.grouplen())
+		self.help += "%plantName:\tName of the plant.\n"
+		self.help += "%plantType%:\tSpecies of the plant.\n"
+		self.help += "Plant name and type can contain spaces, are seperated by a comma (,).\n"
 
 	def runCommand(self, args = None):
 		
@@ -922,7 +928,9 @@ class rmp(netCommand):
 			if (not check):
 				return(chan)
 			group = gs.control.getGroupName(chan)
-			return(gs.db.removePlant(group))
+			if (gs.control.removePlant(group)):
+				return("Succesfully removed plant from container {}.".format(chan))
+			return("Failed to remove plant from container {}. Check log for details.".format(chan))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 
 class cth(netCommand):
