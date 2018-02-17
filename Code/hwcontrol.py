@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.19	15-02-2018
+# v0.9.20	16-02-2018
 
 from collections import OrderedDict
 import csv
@@ -697,6 +697,11 @@ class hwControl(object):
 			if (s in groups):
 				dbCheckData[i][2] = groups[s]
 		return(dbCheckData)
+
+	def setLEDbarMode(self, mode):
+
+		for bar in self.__LEDbars.values():
+			bar.setMode(mode)
 
 	def getADCres(self):
 		"""Returns the resultion of the installed ADC."""

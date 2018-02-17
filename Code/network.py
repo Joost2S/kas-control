@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.1.03	15-02-2018
+# v1.1.04	16-02-2018
 
 from abc import ABCMeta, abstractmethod
 import csv
@@ -1040,6 +1040,23 @@ class pwr(netCommand):
 				msg += "|{}".format(self.getTabs(gs.control.requestData(r + o)))
 			msg += "\n"
 		return(msg)
+	
+class lbm(netCommand):
+
+	def __init__(self):
+		self.command = "barmode"
+		self.name = "LEDbar mode"
+		self.args = "%mode"
+		self.help = "Change LEDbar mode to 'bar' or 'dot'.\n"
+
+	def runCommand(self, args = None):
+
+		if (args is not None):
+			if (args[0] in ["bar", "dot"]):
+				gs.control.setLEDbarMode(args[0])
+				return("LEDbars set to: {}".format(args[0]))
+			return("Not a valid mode for LEDbars.")
+		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 				
 
 class Server(object):
@@ -1071,18 +1088,19 @@ class Server(object):
 		self.__makeSocket()
 		self.clientNr = 1
 		self.commands = {}
-		comms = [ ext(), cur(), tem(),
-					 mst(), dat(), utm(),
-					 hlp(), thr(), wtr(),
-					 vts(), wts(), tsm(),
-					 spf(), flt(), pst(),
-					 set(), get(), gra(),
-					 log(), adp(), rmp(),
-					 cth()  ]
+		comms = [ext(), cur(), tem(),
+					mst(), dat(), utm(),
+					hlp(), thr(), wtr(),
+					vts(), wts(), tsm(),
+					spf(), flt(), pst(),
+					set(), get(), gra(),
+					log(), adp(), rmp(),
+					cth()  ]
 		if (gs.hwOptions["powermonitor"]):
 			comms.extend([led(), stl(),
-					 pwr()])
-
+					pwr()])
+		if (gs.hwOptions["ledbars"]):
+			comms.extend([lbm()])
 		for command in comms:
 			self.commands[command.command] = command
 		gs.server = self

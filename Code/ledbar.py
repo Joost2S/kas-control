@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.5.03	15-02-2018
+# v0.5.04	15-02-2018
 
 import logging
 
@@ -63,9 +63,13 @@ class LEDbar(object):
 
 	def updateBar(self, values, a = 0):
 
-		if (a > len(self.__bounds)):
+		if (a % len(self.__bounds) == 0):
+			# If all values are unavailable, turn off all lPins and end.
+			self.__turnOff(self.__lPins)
 			return
 		if (len(values) == len(self.__displayed)):
+			lOn = []
+			lOff = []
 			newLEDs = 0
 			# Get index of currently displayed value and update to new index.
 			try:
@@ -90,91 +94,66 @@ class LEDbar(object):
 				step = (self.__bounds[i][1] - self.__bounds[i][0]) / len(self.__bounds)
 				low = self.__bounds[i][0] - step
 				newLEDs = int((values[i] - low) / step)
-			if (newLEDs < self.__curLEDs):
-				# get difference.
-				# turn off selected LEDs.
-				pass
+			if (newLEDs != self.__curLEDs and self.__mode == "dot"):
+				lOff.append(self.__curLEDs - 1)
+				lOn.append(newLEDs - 1)
+			elif (newLEDs < self.__curLEDs):
+				# Get lPins to turn off.
+				lOff.extend(self.__lPins[newLEDs - 1 : self.__curLEDs - 1])
 			elif (newLEDs == self.__curLEDs):
-				# Nothing to do really...
+				# No lPins to change.
 				pass
 			elif (newLEDs > self.__curLEDs):
-				# get difference.
-				# turn on selected LEDs.
-				pass
-			self.__iPins
+				# Get lPins to turn on.
+				lOn.extend(self.__lPins[self.__curLEDs - 1 : newLEDs - 1])
+			iOn, iOff = self.__setIpins(i)
+			lOn.extend(iOn)
+			lOff.extend(iOff)
 			self.__curLEDs = newLEDs
+			if (len(lOff) > 0):
+				self.__changeLEDs(lOff, False)
+			if (len(lOn) > 0):
+				self.__changeLEDs(lOn, True)
 		else:
 			logging.warning("List of invalid length passed to LEDbar.")
 
-	def setMode(self, mode):
-
-		if (mode in ["bar", "dot"]):
-			self.__mode = mode
-
 	def __setIpins(self, index):
 
+		on = []
+		off = []
 		current = 0
 		for i, pin in enumerate(self.__iPins):
 			if (pin):
 				current += 2 ** i
 		changed = index ^ current
 		for i, pin in enumerate(self.__iPins):
-			bool(2**i) != bool(b)
+			# Check if pins is changed:
+			if (2**i & changed):
+				# Check if pin needs to be on:
+				if (2**i & current):
+					off.append(pin)
+				# Or if pin needs to be off:
+				else:
+					on.append(pin)
+		return(on, off)
 
-	def dispLEDs(self, value):
-		"""Used to calculate the correct amount of LEDs to indicate levels,
-		based on the displayrange and amount of LEDs."""
+	def __changeLEDs(self, pins, state):
 
-		perStep = (self.rangeUpper - self.rangeLower) / (len(self.lsta) + len(self.lstb) - 1)
-		amount = value - self.rangeLower
-		if (amount <= 0):
-			return
-		elif (value < self.rangeUpper):
-			self.upto(int(amount / perStep))# + 1)
-		else:
-			self.allOn()
-				
-	def returnLists(self):
-		lst = []
-		for l in self.lsta:
-			lst.append("0" + l)
-		for l in self.lstb:
-			lst.append("1" + l)
-		return(lst)
+		changePins = {}
+		for pin in pins:
+			if (not pin[0] in changePins):
+				changePins[0] = []
+			changePins[pin[0]].append(pin)
+		for dev, pinlist in changePins.items():
+			gs.getPinDev(dev).output(pinlist)
+		pass
+	
+	def setMode(self, mode):
 
-	def allOn(self):
-		self.mcp0.output(self.lsta, True)
-		self.mcp1.output(self.lstb, True)
-
-	def oneOn(self, n):
-		self.allOff()
-		if (n < len(self.lsta)):
-			self.mcp0.output((self.lsta[n]), True)
-		elif ((n - len(self.lsta)) < len(self.lstb)):
-			self.mcp1.output((self.lstb[n - len(self.lsta)]), True)
-			
-	def upto(self, n):
-		self.allOff()
-		if (n > (len(self.lsta) + len(self.lstb))):
-			self.allOn()
-		elif (n > len(self.lsta)):
-			self.mcp0.output(self.lsta, True)
-			l = []
-			for i in range(n - len(self.lsta)):
-				l.append(self.lstb[i])
-			self.mcp1.output(l, True)
-		elif (n > 0):
-			l = []
-			for i in range(n):
-				l.append(self.lsta[i])
-			self.mcp0.output(l, True)
-			
-	def allOff(self):
-		self.mcp0.output(self.lsta, False)
-		self.mcp1.output(self.lstb, False)
-
-	def oneOff(self, n):
-		if (n < len(self.lsta)):
-			self.mcp0.output(self.lsta[n], False)
-		elif ((n - len(self.lsta)) < len(self.lstb)):
-			self.mcp1.output(self.lstb[n - len(self.lsta)], False)
+		if (mode in ["bar", "dot"]):
+			if (self.__mode != mode):
+				self.__mode = mode
+				if (mode == "bar"):
+					self.__changeLEDs(self.__lPins[:self.__curLEDs - 2], True)
+				else:
+					self.__changeLEDs(self.__lPins[:self.__curLEDs - 2], False)
