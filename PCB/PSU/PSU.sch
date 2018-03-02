@@ -138,12 +138,12 @@ $EndComp
 $Comp
 L +12V #PWR01
 U 1 1 59A7360D
-P 8050 3600
-F 0 "#PWR01" H 8050 3450 50  0001 C CNN
-F 1 "+12V" H 8050 3740 50  0000 C CNN
-F 2 "" H 8050 3600 50  0000 C CNN
-F 3 "" H 8050 3600 50  0000 C CNN
-	1    8050 3600
+P 8050 3400
+F 0 "#PWR01" H 8050 3250 50  0001 C CNN
+F 1 "+12V" H 8050 3540 50  0000 C CNN
+F 2 "" H 8050 3400 50  0000 C CNN
+F 3 "" H 8050 3400 50  0000 C CNN
+	1    8050 3400
 	0    1    1    0   
 $EndComp
 $Comp
@@ -274,13 +274,13 @@ $EndComp
 $Comp
 L R_Small R1
 U 1 1 59A7DE44
-P 7850 1500
-F 0 "R1" H 7880 1520 50  0000 L CNN
-F 1 "0R04" H 7880 1460 50  0000 L CNN
-F 2 "Resistors_SMD:R_2512_HandSoldering" H 7850 1500 50  0001 C CNN
-F 3 "" H 7850 1500 50  0000 C CNN
-	1    7850 1500
-	0    -1   -1   0   
+P 7950 1400
+F 0 "R1" H 7980 1420 50  0000 L CNN
+F 1 "0R04" H 7980 1360 50  0000 L CNN
+F 2 "Resistors_SMD:R_2512_HandSoldering" H 7950 1400 50  0001 C CNN
+F 3 "" H 7950 1400 50  0000 C CNN
+	1    7950 1400
+	-1   0    0    1   
 $EndComp
 $Comp
 L C_Small C5
@@ -296,12 +296,12 @@ $EndComp
 $Comp
 L +5V #PWR06
 U 1 1 59A7EE54
-P 7950 1500
-F 0 "#PWR06" H 7950 1350 50  0001 C CNN
-F 1 "+5V" H 7950 1640 50  0000 C CNN
-F 2 "" H 7950 1500 50  0000 C CNN
-F 3 "" H 7950 1500 50  0000 C CNN
-	1    7950 1500
+P 8050 1300
+F 0 "#PWR06" H 8050 1150 50  0001 C CNN
+F 1 "+5V" H 8050 1440 50  0000 C CNN
+F 2 "" H 8050 1300 50  0000 C CNN
+F 3 "" H 8050 1300 50  0000 C CNN
+	1    8050 1300
 	0    1    1    0   
 $EndComp
 $Comp
@@ -366,13 +366,13 @@ $EndComp
 $Comp
 L R_Small R2
 U 1 1 59A8C52C
-P 7850 3600
-F 0 "R2" H 7880 3620 50  0000 L CNN
-F 1 "0R04" H 7880 3560 50  0000 L CNN
-F 2 "Resistors_SMD:R_2512_HandSoldering" H 7850 3600 50  0001 C CNN
-F 3 "" H 7850 3600 50  0000 C CNN
-	1    7850 3600
-	0    -1   -1   0   
+P 7950 3500
+F 0 "R2" H 7980 3520 50  0000 L CNN
+F 1 "0R04" H 7980 3460 50  0000 L CNN
+F 2 "Resistors_SMD:R_2512_HandSoldering" H 7950 3500 50  0001 C CNN
+F 3 "" H 7950 3500 50  0000 C CNN
+	1    7950 3500
+	-1   0    0    1   
 $EndComp
 $Comp
 L C_Small C6
@@ -1164,7 +1164,7 @@ Connection ~ 2550 3950
 Wire Wire Line
 	2550 4150 2850 4150
 Wire Wire Line
-	3400 3600 7850 3600
+	3400 3600 7950 3600
 Connection ~ 4350 3600
 Connection ~ 6600 3600
 Connection ~ 4350 1500
@@ -2284,11 +2284,11 @@ F 3 "" H 7900 5500 50  0001 C CNN
 	1    7900 5500
 	1    0    0    -1  
 $EndComp
-Text Label 7500 5500 0    60   ~ 0
+Text Label 7500 5600 0    60   ~ 0
 SDA
 Wire Wire Line
 	7350 5500 7700 5500
-Text Label 7500 5600 0    60   ~ 0
+Text Label 7500 5500 0    60   ~ 0
 CSL
 Wire Wire Line
 	7450 5600 7700 5600
@@ -2472,12 +2472,9 @@ F 3 "" H 7800 2100 60  0001 C CNN
 	0    1    1    0   
 $EndComp
 Wire Wire Line
-	7950 1650 7950 1500
+	7950 1500 7950 1650
 Wire Wire Line
-	3400 1500 7850 1500
-Wire Wire Line
-	7850 1500 7850 1650
-Connection ~ 7750 1500
+	3400 1500 7950 1500
 Wire Wire Line
 	7750 2750 7750 2550
 Wire Wire Line
@@ -2495,10 +2492,7 @@ Wire Wire Line
 	7550 1650 7650 1650
 Connection ~ 7350 1800
 Wire Wire Line
-	7950 3750 7950 3600
-Wire Wire Line
-	7850 3600 7850 3750
-Connection ~ 7750 3600
+	7950 3600 7950 3750
 $Comp
 L GND #PWR052
 U 1 1 5A63D2F4
@@ -2510,8 +2504,6 @@ F 3 "" H 7200 3900 50  0000 C CNN
 	1    7200 3900
 	0    1    1    0   
 $EndComp
-Wire Wire Line
-	7950 3600 8050 3600
 Wire Wire Line
 	7200 3700 7750 3700
 Wire Wire Line
@@ -2896,4 +2888,14 @@ F 3 "" H 9600 4500 50  0001 C CNN
 	0    1    1    0   
 $EndComp
 Connection ~ 9700 4500
+Wire Wire Line
+	7850 1650 7850 1300
+Wire Wire Line
+	7850 1300 8050 1300
+Connection ~ 7950 1300
+Wire Wire Line
+	7850 3750 7850 3400
+Wire Wire Line
+	7850 3400 8050 3400
+Connection ~ 7950 3400
 $EndSCHEMATC
