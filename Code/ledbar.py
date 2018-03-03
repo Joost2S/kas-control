@@ -63,9 +63,9 @@ class LEDbar(object):
 
 	def updateBar(self, values, a = 0):
 
-		if (a % len(self.__bounds) == 0):
+		if (a % len(self.__bounds) == 0 and a > 0):
 			# If all values are unavailable, turn off all lPins and end.
-			self.__turnOff(self.__lPins)
+			self.__changeLEDs(self.__lPins, False)
 			return
 		if (len(values) == len(self.__displayed)):
 			lOn = []
@@ -94,6 +94,7 @@ class LEDbar(object):
 				step = (self.__bounds[i][1] - self.__bounds[i][0]) / len(self.__bounds)
 				low = self.__bounds[i][0] - step
 				newLEDs = int((values[i] - low) / step)
+			# Get lPin changes for dot mode:
 			if (newLEDs != self.__curLEDs and self.__mode == "dot"):
 				lOff.append(self.__curLEDs - 1)
 				lOn.append(newLEDs - 1)
@@ -143,10 +144,9 @@ class LEDbar(object):
 		for pin in pins:
 			if (not pin[0] in changePins):
 				changePins[0] = []
-			changePins[pin[0]].append(pin)
+			changePins[pin[0]].append(gs.getPinNr(pin))
 		for dev, pinlist in changePins.items():
-			gs.getPinDev(dev).output(pinlist)
-		pass
+			gs.getPinDev(dev).output(pinlist, state)
 	
 	def setMode(self, mode):
 

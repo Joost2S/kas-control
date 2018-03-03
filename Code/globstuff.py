@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.8.19	11-02-2018
+# v0.8.20	02-03-2018
 
 
 from abc import ABCMeta, abstractmethod
@@ -436,13 +436,15 @@ class globstuff:
 	def getPinDev(pin):
 		"""Returns the mpc23017 device for the corresponding pin."""
 		
-		if (int(pin[0]) < len(globstuff.mcplist)):
+		try:
 			return(globstuff.mcplist[int(pin[0])])
-		else:
+		except ValueError:
 			logging.error("Invalid MCP23017 instance: " + str(pin))
 			return(None)
 			
 	def getThreadNr():
+		"""Just counts the threads."""
+
 		globstuff.threadnr +=1
 		return(globstuff.threadnr)
 		
@@ -506,7 +508,6 @@ class globstuff:
 		print("Shutting down system.")
 		globstuff.running = False
 		globstuff.control.disable()
-		globstuff.db.running = False
 		for t in globstuff.draadjes:
 				t.join()
 		print("Cleaning up and exiting Main Thread")

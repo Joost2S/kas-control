@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.7.10	15-02-2018
+# v0.7.11	02-03-2018
 
 import logging
 import RPi.GPIO as GPIO
@@ -36,9 +36,17 @@ try:
 	# Getting the MCP23017 GPIO expanders ready for use:
 	for mcp in gs.mcplist:
 		mcp.engage()
+		
+	#	Start monitoring the soil and other sensors.
+	monitor = hwcontrol.Monitor(gs.getThreadNr(), "Monitor")
+	monitor.start()
+	gs.draadjes.append(monitor)
+	
+	#	 Start recording the sensor data to the DB.
+	datalog = database.Datalog(gs.getThreadNr(), "Datalog")
+	datalog.start()
+	gs.draadjes.append(datalog)
 
-	gs.db.startDatalog()
-	gs.control.startMonitor()
 	gs.server.serverLoop()
 except network.shutdownError:
 	logging.info("Shutdown by client.")

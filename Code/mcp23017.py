@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.11	10-02-2018
+# v0.9.12	17-02-2018
 
 """
 This is a python driver for an i2c MCP23017. python-smbus must be installed for this driver to work.
@@ -197,6 +197,12 @@ class mcp230xx(object):
 		self.enabled = False
 		self.interruptObjects = {}
 		self.GPA = []
+		# Setting interrupt pin on the Raspberry Pi.
+		if (self.intPin is not None):
+			import RPi.GPIO as GPIO
+			GPIO.setup(self.intPin, GPIO.IN, pull_up_down = GPIO.PUD_UP)
+			GPIO.add_event_detect(self.intPin, GPIO.FALLING, callback = self.runInterrupt)
+			logging.info("Set interrupt on {} with GPIO pin {}".format(hex(self.devAddr), self.intPin))
 		# Populating banks with unset pins.
 		for i in range(8):
 			self.GPA.append(Pin(2 ** i, "B" + str(i)))
@@ -287,13 +293,13 @@ class mcp230xx(object):
 	def setSetup(self, reg, val):
 		"""Call this method to change a setting in IOCON. See datasheet for details."""
 
-		try:
-			if (val):
-				self.IOCON[reg.upper()] = True
-			else:
-				self.IOCON[reg.upper()] = False
-		except:
-			logging.warning("Failed to set register " + str(reg).upper())
+		if (reg.upper() in self.IOCON.keys()):
+			try:
+				self.IOCON[reg.upper()] = bool(val)
+			except ValueError:
+				logging.warning("Failed to set register " + str(reg).upper())
+		else:
+			logging.debug("Cannot set register {}. Does not exist.".format(reg.upper()))
 
 	def output(self, pins, state):
 		"""Call this method to change one or more output pins to low (state = False) or high (state = True)."""
@@ -444,13 +450,7 @@ class mcp230xx(object):
 class mcp23008(mcp230xx):
 	
 	def __init__(self, devAddr, intPin = None):
-		# Setting the interrupt pin(s) on the Raspberry Pi.
-		super(mcp23008, self).__init__(devAddr, intPin = None)
-		if (self.intPin is not None):
-			import RPi.GPIO as GPIO
-			GPIO.setup(self.intPin, GPIO.IN, pull_up_down = GPIO.PUD_UP)
-			GPIO.add_event_detect(self.intPin, GPIO.FALLING, callback = self.runInterrupt)
-			logging.info("Set interrupt on {} with GPIO pin {}".format(hex(self.devAddr), self.intPin))
+		super(mcp23008, self).__init__(devAddr, intPin)
 		self.regMap = {
 					# Direction
 					"IODIR" : 0x00,
@@ -543,12 +543,18 @@ class mcp23017(mcp230xx):
 	
 	def __init__(self, devAddr, intPin = None, intPin2 = None):
 		
-		super(mcp23017, self).__init__(devAddr, intPin = None)
+		super(mcp23017, self).__init__(devAddr, intPin)
 		self.intPin2 = intPin2
 		self.hasBinput = False		#	True if there is at least one pin in the B bank set as an input.
 		if (intPin1 is not None and intPin2 is not None):
 			self.setSetup("MIRROR", False)
 		self.GPB = []
+		# Setting the second interrupt pin on the Raspberry Pi.
+		if (self.intPin2 is not None):
+			import RPi.GPIO as GPIO
+			GPIO.setup(self.intPin2, GPIO.IN, pull_up_down = GPIO.PUD_UP)
+			GPIO.add_event_detect(self.intPin2, GPIO.FALLING, callback = self.runInterrupt)
+			logging.info("Set interrupt pin 2 on {} with GPIO pin {}".format(hex(self.devAddr), self.intPin))
 		# Populating banks with unset pins.
 		for i in range(8):
 			self.GPB.append(Pin(2 ** i, "A" + str(i)))
@@ -573,17 +579,6 @@ class mcp23017(mcp230xx):
 					# OLATx, use to set output pin state.
 					"OLATA":	0X14,			"OLATB":	0X15
 				}
-		# Setting the interrupt pin(s) on the Raspberry Pi.
-		if (self.intPin is not None or self.intPin2 is not None):
-			import RPi.GPIO as GPIO
-			if (self.intPin is not None):
-				GPIO.setup(self.intPin, GPIO.IN, pull_up_down = GPIO.PUD_UP)
-				GPIO.add_event_detect(self.intPin, GPIO.FALLING, callback = self.runInterrupt)
-				logging.info("Set interrupt from dev {} on GPIO pin {}".format(hex(self.devAddr), self.intPin))
-			if (self.intPin2 is not None):
-				GPIO.setup(self.intPin2, GPIO.IN, pull_up_down = GPIO.PUD_UP)
-				GPIO.add_event_detect(self.intPin2, GPIO.RISING, callback = (self.runInterrupt))
-				logging.info("Set interrupt pin 2 from dev {} on GPIO pin {}".format(hex(self.devAddr), self.intPin))
 
 				
 	def engage(self):

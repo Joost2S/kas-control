@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.20	16-02-2018
+# v0.9.21	02-03-2018
 
 from collections import OrderedDict
 import csv
@@ -44,6 +44,7 @@ class hwControl(object):
 	__floatSwitch = None		# Reference to floatSwitch object
 	__LCD = None				# Reference to an hd44780 16x02 or 20x04 LCD
 	__LEDbars = {}				# Reference to some LEDbars.
+	__tempbar = []
 	__fan = None				# Reference to fan object.
 	__fanToggleTemp = 50		# Temoerature at which to turn on fan.
 	__template = ""			# Template for __currentstats
@@ -69,10 +70,13 @@ class hwControl(object):
 			self.__floatSwitch = globstuff.floatUp(gs.float_switch, self.__pump, self.__statusLED)
 		if (gs.hwOptions["lcd"]):
 			self.__LCD = hd44780.Adafruit_CharLCD(gs.LCD_RS, gs.LCD_E, gs.LCD4, gs.LCD5, gs.LCD6, gs.LCD7, *gs.LCD_SIZE, gs.LCD_L)
+			self.__LCD.enable_display(True)
 		if (gs.hwOptions["powermonitor"]):
 			self.__plcontroller = powerLEDs.PowerLEDcontroller()
 		if (gs.hwOptions["fan"]):
 			self.__fan = globstuff.fan(gs.fanPin)
+		if (gs.hwOptions["ledbars"]):
+			self.__tempbar = ["ambientt", "out_shade"]
 		self.__template = self.__setTemplate()
 		self.setTimeRes()
 		self.__checkConnected()
@@ -472,16 +476,15 @@ class hwControl(object):
 	def startMonitor(self):
 		"""Use this function to start monitor to prevent more than 1 instance running at a time."""
 
+		running = False
 		for t in gs.draadjes:
 			if (t.name == "Monitor" and t.is_alive()):
-				return
-
-		#	Start monitoring the soil and other sensors.
-		monitor = Monitor(gs.getThreadNr(), "Monitor", self)
-		monitor.start()
-		gs.draadjes.append(monitor)
-
-	def _monitor(self):
+				if (running):
+					return
+				running = True
+		self.__monitor()
+		
+	def __monitor(self):
 		"""\t\tMain monitoring method. Will check on the status of all sensors every %timeRes seconds.
 		Will also start methods/actions based on the sensor input."""
 
@@ -521,7 +524,7 @@ class hwControl(object):
 					gt.append(t)
 					gf.append(f)
 					if (not gs.running):
-						break
+						return
 				
 				# Get data from other sensors.
 				bardata = []
@@ -531,6 +534,8 @@ class hwControl(object):
 						sdata.append(self.requestData(name = s, perc = True))
 					elif (self.__sensors[s] == "temp"):
 						sdata.append(self.requestData(name = s))
+						if (s in self.__tempbar):
+							bardata.append(sdata[-1])
 					elif (self.__sensors[s] == "cputemp"):
 						sdata.append(gs.getCPUtemp())
 					elif (self.__sensors[s] == "flow"):
@@ -538,8 +543,10 @@ class hwControl(object):
 
 				# Sort data to make it available in raw and formatted forms.
 #				data.extend(gn)
-				for m in gm:
+				for i, m in enumerate(gm):
 					data.append(self.__perc(m))
+					if (gs.hwOptions["ledbars"]):
+						gm[i] = self.__perc(m)
 				data.extend(gm)
 				if (gs.hwOptions["soiltemp"]):
 					data.extend(gt)
@@ -556,7 +563,7 @@ class hwControl(object):
 					pass
 				if (gs.hwOptions["ledbars"]):
 					self.__LEDbars["mst"].updateBar(gn, gm)
-					self.__LEDbars["temps"].updateBar()
+					self.__LEDbars["temps"].updateBar(self.__tempbar, bardata)
 				print(self.__currentstats)
 
 				# Waiting for next interval of timeRes to start next itertion of loop.
@@ -738,12 +745,15 @@ class hwControl(object):
 		for g in self.__groups.values():
 			g.valve.off()
 		# reset INA219 devices if option.
+		if (gs.hwOptions["lcd"]):
+			self.__LCD.enable_display(False)
 		# Turn off LCD if option.
-		# Turn off status LED if option.
+		if (gs.hwOptions["status LED"]):
+			self.__statusLED.disable()
 
 
 class Monitor(globstuff.protoThread):
 	def run(self):
 		logging.info("Starting thread{0}: {1}".format(self.threadID, self.name))
-		self.args._monitor()
+		gs.control.startMonitor()
 		logging.info("Exiting thread{0}: {1}".format(self.threadID, self.name))

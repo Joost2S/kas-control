@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.6.04	15-02-2018
+# v0.6.05	02-03-2018
 
 import logging
 import threading
@@ -65,17 +65,14 @@ class Group(object):
 		with self.__lock:
 			moist = gs.control.requestData(name = self.mstName)
 			if (gs.running and not gs.testmode):
-				try:
-					moist = float(moist)
-				except:
-					return(moist)
-				if (moist <= self.lowtrig and gs.control.isPumpEnabled()):
-					self.below_range += 1
-					if (self.below_range >= 5):
-						wt = wateringthread(gs.getThreadNr(), "watering" + str(self.groupname[-1]), args = self)
-						wt.start()
-						gs.wtrThreads.append(wt)
-						self.below_range = 0
+				if (isinstance(moist, float)):
+					if (moist <= self.lowtrig and gs.control.isPumpEnabled()):
+						self.below_range += 1
+						if (self.below_range >= 5):
+							wt = wateringthread(gs.getThreadNr(), "watering" + str(self.groupname[-1]), args = self)
+							wt.start()
+							gs.wtrThreads.append(wt)
+							self.below_range = 0
 			return(moist)
 
 	def getT(self):

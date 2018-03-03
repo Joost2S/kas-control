@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.4.00	15-02-2018
+# v0.4.02	02-03-2018
 
 from collections import OrderedDict
 from datetime import datetime, timedelta
@@ -541,16 +541,15 @@ class Database(object):
 	def startDatalog(self):
 		"""Use this function to start datalog to prevent more than 1 instance running at a time."""
 		
+		running = False
 		for t in gs.draadjes:
 			if (t.name == "Datalog" and t.is_alive()):
-				return
+				if (running):
+					return
+				running = True
+		self.__datalog()
 
-		#	 Start recording the sensor data to the DB.
-		datalog = Datalog(gs.getThreadNr(), "Datalog", self)
-		datalog.start()
-		gs.draadjes.append(datalog)
-
-	def _datalog(self):
+	def __datalog(self):
 		"""This is the main datalogging method. Every %interval minutes the data will be recorded into the database."""
 
 		# Waiting to ensure recordings are synced to __interval
@@ -573,7 +572,7 @@ class Database(object):
 				for n in self.__sensors.keys():
 					txt1 += ", " + str(n)
 					txt2 += ", " + str(self.__getValue(n))
-				dbmsg += (");")
+				dbmsg = (txt1 + txt2 + ");")
 				self.__dbWrite(dbmsg)
 
 			# Waiting for next interval of timeRes to start next itertion of loop.
@@ -602,8 +601,8 @@ class Datalog(globstuff.protoThread):
 	def run(self):
 		logging.info("Starting thread{0}: {1}".format(self.threadID, self.name))
 		try:
-			self.args._datalog()
-		except database.dbVaildationError:
+			gs.db.startDatalog()
+		except dbVaildationError:
 			pass
 		except:
 			logging.error("Error occured in datalog")

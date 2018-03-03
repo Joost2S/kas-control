@@ -27,10 +27,10 @@ totalw, 14
 	1A3, 0A6, 0A7,	0,			 15,		None
 	1A4, 0A4, 0A5,	1,			 17,		None
 	1A5, 0A2, 0A3,	2,			 18,		None
-	1A6, 1B1, 0B0,	3,			 27,		None
-	1A7, 1B3, 0B2,	4,			1B6,		000006d218ac
-	1A1, 1B5, 0B4,	5,			1B7,		03168bf394ff
-#	1A2, 1B7, 0B6,	6,			None,		None
+	1A6, 0B1, 0B0,	3,			 27,		None
+	1A7, 0B3, 0B2,	4,			1B6,		000006d218ac
+	1A1, 0B5, 0B4,	5,			1B7,		03168bf394ff
+#	1A2, 0B7, 0B6,	6,			None,		None
 
 #ledbar
 # name,	Icount,	ledPins
