@@ -124,6 +124,7 @@ class MCP3x0x(object):
 			logging.warning("Set output to either \"cons\" or \"log\".")
 
 	def getResolution(self):
+
 		return(self.__bits)
 
 	def __debugReturn(self, name, value):

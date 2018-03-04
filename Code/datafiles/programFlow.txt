@@ -40,7 +40,8 @@
 		- set gs.server to reference to server instance
 	- init buttons
 	- engage gpio expanders
+	- start control.powermanager thread
 	- start db.datalog thread
-	- start monitor thread -->
+	- start control.monitor thread -->
 		- Blink status LED or turn on LCD backlight to indicate to user the system is online
 	- start serverloop

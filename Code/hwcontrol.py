@@ -1,12 +1,13 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.21	02-03-2018
+# v0.9.22	03-03-2018
 
 from collections import OrderedDict
 import csv
 from datetime import datetime, timedelta
 import logging
+import Queue
 import RPi.GPIO as GPIO
 import threading
 import time
@@ -44,9 +45,10 @@ class hwControl(object):
 	__floatSwitch = None		# Reference to floatSwitch object
 	__LCD = None				# Reference to an hd44780 16x02 or 20x04 LCD
 	__LEDbars = {}				# Reference to some LEDbars.
-	__tempbar = []
+	__tempbar = []				# List of sensor names for the temperature LEDbar
 	__fan = None				# Reference to fan object.
-	__fanToggleTemp = 50		# Temoerature at which to turn on fan.
+	__fanToggleTemp = 45		# Temoerature at which to turn on fan.
+	__powerQueue = None		# Priority queue to keep track of the powerconsuming devices on the 12v rail.
 	__template = ""			# Template for __currentstats
 	__currentstats = ""		# Latest output of the monitor method. Is formatted for display in console.
 	__rawStats = []			# List with the latest results from sensors.
@@ -69,7 +71,7 @@ class hwControl(object):
 		if (gs.hwOptions["floatswitch"]):
 			self.__floatSwitch = globstuff.floatUp(gs.float_switch, self.__pump, self.__statusLED)
 		if (gs.hwOptions["lcd"]):
-			self.__LCD = hd44780.Adafruit_CharLCD(gs.LCD_RS, gs.LCD_E, gs.LCD4, gs.LCD5, gs.LCD6, gs.LCD7, *gs.LCD_SIZE, gs.LCD_L)
+			self.__LCD = hd44780.Adafruit_CharLCD(gs.LCD_RS, gs.LCD_E, gs.LCD4, gs.LCD5, gs.LCD6, gs.LCD7, *gs.LCD_SIZE, gs.LCD_L, initial_backlight = 0)
 			self.__LCD.enable_display(True)
 		if (gs.hwOptions["powermonitor"]):
 			self.__plcontroller = powerLEDs.PowerLEDcontroller()
@@ -77,9 +79,9 @@ class hwControl(object):
 			self.__fan = globstuff.fan(gs.fanPin)
 		if (gs.hwOptions["ledbars"]):
 			self.__tempbar = ["ambientt", "out_shade"]
+		self.__powerQueue = Queue.PriorityQueue()
 		self.__template = self.__setTemplate()
 		self.setTimeRes()
-		self.__checkConnected()
 		gs.control = self
 
 
@@ -96,8 +98,8 @@ class hwControl(object):
 						return("Sensor {} is not of type {}.".format(name, type))
 					type = self.__sensors[name][1]
 					if (type == "mst"):
-						if (caller == "db" or caller == "wtr"):
-							return(self.__adc.getMeasurement(name, perc))
+						if (caller in ["db", "wtr"]):
+							return(self.__adc.getMeasurement(name))
 						else:
 							for g in self.__groups.values():
 								if (g.mstName == name):
@@ -119,21 +121,13 @@ class hwControl(object):
 							return(None)
 						if (caller == "db"):
 							return(self.__flowSensors[name].storePulses())
-						return
+						return(self.__flowSensors[name].getFlowRate())
 					if (type == "temp"):
 						if (name[-2] == "g" and not gs.hwOptions["soiltemp"]):
 							return(None)
 						temp = self.__tempMGR.getMeasurement(name)
 						if (name.upper() == "PSU"):
-							if (temp > self.__maxPSUtemp):
-								pass
-								#doEmergencyThing()
-							elif (temp > self.__fanToggleTemp):
-								if (not self.__fan.getState()):
-									self.__fan.on()
-							elif (temp < (self.__fanToggleTemp - 10)):
-								if (self.__fan.getState()):
-									self.__fan.off()
+							self.__checkPSUtemp(temp)
 						return(temp)
 				elif (type == "pwr"):
 					# name = "12vp"
@@ -180,6 +174,18 @@ class hwControl(object):
 			logging.error("Error occured during measurement of " + str(type) + " at channel: " + str(name))
 			return(False)
 		
+	def __checkPSUtemp(self, temp):
+		
+		if (temp > self.__maxPSUtemp):
+			pass
+			#doEmergencyThing()
+		elif (temp > self.__fanToggleTemp):
+			if (not self.__fan.getState()):
+				self.__fan.on()
+		elif (temp < (self.__fanToggleTemp - 15)):
+			if (self.__fan.getState()):
+				self.__fan.off()
+
 	def requestPumping(self, name, forTime = None):
 		"""
 		Method to request pumping water to a container. Requests will be accepted if
@@ -240,25 +246,42 @@ class hwControl(object):
 	def __requestPower(self, *cur):
 		"""Use this method to check if enough power is available for the requested action."""
 
+		# There is a delay of a second so the effects of the last request can be noticed.
+		while ((time.time() - self.__lastPowerRequest) < 1.0):
+			time.sleep(1)
+		self.__lastPowerRequest = time.time()
 		if (gs.hwOptions["powermonitor"]):
-			# There is a delay of a second so the effects of the last request can be noticed.
-			while ((time.time() - self.__lastPowerRequest) < 1.0):
-				time.sleep(1)
-			self.__lastPowerRequest = time.time()
 			current = self.__ina["12v"].getCurrent()		# get current power draw from the PSU.
-			if (isinstance(cur[0])):
-				for c in cur:
-					current += cur[0]
-			else:
-				for c in cur:
-					current += c.power
-			print("Expected power draw: " + str(current) + " mA")
-			if (current > self.__maxPower):
-				return(False)
 		else:
 			pass
+		if (isinstance(cur[0], int)):
+			for c in cur:
+				current += c
+		else:
+			for c in cur:
+				current += c.power
+		print("Expected power draw: " + str(current) + " mA")
+		if (current > self.__maxPower):
+			return(False)
 		return(True)
 		
+	def startPowerManager(self):
+		"""Use this function to start powerManager to prevent more than 1 instance running at a time."""
+
+		running = False
+		for t in gs.draadjes:
+			if (t.name == "PowerManager" and t.is_alive()):
+				if (running):
+					return
+				running = True
+		self.__checkConnected()
+		self.__powerManager()
+
+	def __powerManager(self):
+
+		while (gs.running):
+			task = self.__powerQueue.get()
+
 	def disable(self):
 
 		self.__enabled = False
@@ -295,6 +318,8 @@ class hwControl(object):
 			elif (high > upperthreshold):
 				return("Too high value for hightrig. Value must be <= {}".format(upperthreshold))
 		self.__groups[group].setTriggers(low, high)
+		if (gs.hwOptions["ledbars"]):
+			self.__LEDbars["mst"].updateBounds(self.__groups[group].groupname, self.__groups[group].lowtrig, self.__groups[group].hightrig)
 		return("New value of trigger: {}, {}".format(self.__groups[group].lowtrig, self.__groups[group].hightrig))
 
 	def getTriggers(self, group):
@@ -385,6 +410,7 @@ class hwControl(object):
 								self.__flowSensors[output[0]] = flowsensor.flowMeter(output[1])
 							elif (curType == "pwr" and gs.hwOptions["powermonitor"]):
 								self.__setINA219dev(output)
+								continue
 							self.__otherSensors.append(output[0])
 				
 						# Setting sensors of groups and making group instances.
@@ -427,7 +453,9 @@ class hwControl(object):
 		self.__ina[output[0]].setCalibration(int(output[7]), float(output[8]))
 		self.__ina[output[0]].engage()
 		self.__sensors[output[0] + "v"] = "pwr"
+		self.__otherSensors[output[0] + "v"] = "pwr"
 		self.__sensors[output[0] + "c"] = "pwr"
+		self.__otherSensors[output[0] + "c"] = "pwr"
 		
 	def __setTemplate(self):
 		"""Generates the template for the formatted currentstats."""
@@ -441,18 +469,18 @@ class hwControl(object):
 		if (gs.hwOptions["soiltemp"]):
 			lines.append("Temp")
 		for i in range(len(self.__groups)):
-			lines[1] += "\t|{}"
-			lines[2] += "\t|{}"
+			lines[1] += "|{}"
+			lines[2] += "|{}"
 			if (gs.hwOptions["flowsensors"]):
-				lines[3] += "\t|{}"
+				lines[3] += "|{}"
 			if (gs.hwOptions["soiltemp"]):
-				lines[4] += "\t|{}"
+				lines[4] += "|{}"
 		lines.append("")
 		currentlines = len(lines)
 		lines.append("Light:\tTemps:")
 		if (gs.hwOptions[""]):
 			for t in self.__otherSensors:
-				if (self.__sensors[t] == "temp" or self.__sensors[t] == "cputemp"):
+				if (self.__sensors[t] in ["temp", "cputemp"]):
 					lines[currentlines + 0] += "\t"
 			lines[currentlines + 0] += "Water:"
 		if (gs.hwOptions[""]):
@@ -465,8 +493,8 @@ class hwControl(object):
 		for t in self.__otherSensors:
 			if (len(t) > 6):
 				t = t[:6]
-			lines[currentlines + 1] += "|{}\t".format(t)
-			lines[currentlines + 2] += "|{}\t"
+			lines[currentlines + 1] += "|{}".format(t)
+			lines[currentlines + 2] += "|{}"
 
 		template = ""
 		for l in lines:
@@ -482,6 +510,7 @@ class hwControl(object):
 				if (running):
 					return
 				running = True
+		self.__checkConnected()
 		self.__monitor()
 		
 	def __monitor(self):
@@ -495,13 +524,15 @@ class hwControl(object):
 		# water	|{water1}|{water2}|{water3}|{water4}|{water5}|{water6}
 		# temp	|{temp1}	|{temp2}	|{temp3}	|{temp4}	|{temp5}	|{temp6}
 		# Other sensors:
-		#	Light:	Temps:										Water:
-		#	|{ambient}|{sun}	|{shade}	|{ambient}|{cpu}	|{total}
-		#	|{light}	|{temp}	|{temp}	|{temp}	|{temp}	|{water}
+		#	Light:	Temps:													Water:	Power:
+		#	|{ambient}|{sun}	|{shade}	|{ambient}|{cpu}	|{PSU}	|{total}	|{5v}		|{5v}		|{12v}	|{12v}
+		#	|{light}	|{temp}	|{temp}	|{temp}	|{temp}	|{temp}	|{water}	|{power}	|{volt}	|{power}	|{volt}
 
 		
 		#	Indicate to user that the system is up and running.
-		if (not gs.hwOptions["lcd"]):
+		if (gs.hwOptions["lcd"]):
+			self.__LCD.set_backlight(1)
+		else:
 			self.__statusLED.blinkSlow(3)
 
 		try:
@@ -532,13 +563,7 @@ class hwControl(object):
 				for s in self.__otherSensors:
 					if (self.__sensors[s] == "light"):
 						sdata.append(self.requestData(name = s, perc = True))
-					elif (self.__sensors[s] == "temp"):
-						sdata.append(self.requestData(name = s))
-						if (s in self.__tempbar):
-							bardata.append(sdata[-1])
-					elif (self.__sensors[s] == "cputemp"):
-						sdata.append(gs.getCPUtemp())
-					elif (self.__sensors[s] == "flow"):
+					else:
 						sdata.append(self.requestData(name = s))
 
 				# Sort data to make it available in raw and formatted forms.
@@ -556,11 +581,15 @@ class hwControl(object):
 				self.__rawStats = data
 
 				# Formatting data.
+				for i, value in enumerate(data):
+					if (i == 0):
+						continue
+					data[i] = gs.getTabs(value, 1, 7)
 				self.__currentstats = self.__template.format(*data)
 
 				# Outputting data to availabe outouts:
 				if (gs.hwOptions["lcd"]):
-					pass
+					self.__setLCD()
 				if (gs.hwOptions["ledbars"]):
 					self.__LEDbars["mst"].updateBar(gn, gm)
 					self.__LEDbars["temps"].updateBar(self.__tempbar, bardata)
@@ -602,6 +631,10 @@ class hwControl(object):
 				else:
 					logging.debug("{} enabled".format(g.groupname))
 			
+	def __setLCD(self, values):
+
+		pass
+
 	def powerLEDtoggle(self, channel):
 		"""Toggle powerLED channel. Can only turn on if channel is set."""
 
@@ -750,10 +783,17 @@ class hwControl(object):
 		# Turn off LCD if option.
 		if (gs.hwOptions["status LED"]):
 			self.__statusLED.disable()
-
+			
 
 class Monitor(globstuff.protoThread):
 	def run(self):
 		logging.info("Starting thread{0}: {1}".format(self.threadID, self.name))
 		gs.control.startMonitor()
+		logging.info("Exiting thread{0}: {1}".format(self.threadID, self.name))
+
+
+class PowerManager(globstuff.protoThread):
+	def run(self):
+		logging.info("Starting thread{0}: {1}".format(self.threadID, self.name))
+		gs.control.startPowerManager()
 		logging.info("Exiting thread{0}: {1}".format(self.threadID, self.name))

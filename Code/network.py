@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.1.04	16-02-2018
+# v1.1.05	03-03-2018
 
 from abc import ABCMeta, abstractmethod
 import csv
@@ -65,23 +65,6 @@ class netCommand(object):
 		except:
 			return(False, "Enter valid channel. (1 - {0})".format(gs.control.grouplen()))
 		return(True, "group" + str(container))
-	
-	def getTabs(self, txt, tabs = 2, tablength = 8):
-		"""Returns a tring of a fixed length for easier formatting of tables. Assuming your console has a tab length of 8 chars."""
-
-		txt = str(txt)
-		size = tabs * tablength
-		if (len(txt) > size):
-			return(txt[:size])
-		elif (len(txt) == size):
-			return(txt)
-		elif (tablength == 8):
-			t = int(size / len(txt))
-			if (size % len(txt) != 0):
-				t += 1
-			return(txt + "\t" * t)
-		else:
-			return(txt + " " * (tabs * tablength - len(txt)))
 
 	def isInt(self, intgr):
 		try:
@@ -168,7 +151,7 @@ class tem(netCommand):
 		data = gs.control.requestData("temp")
 		if (len(data) > 0):
 			for t in data:
-				txt += "{}| {}".format(self.getTabs(t[0]), t[1])
+				txt += "{}| {}".format(gs.getTabs(t[0]), t[1])
 		else:
 			txt = "No temperature devices found."
 		return(txt)
@@ -290,7 +273,7 @@ class dat(netCommand):
 		if (data is None):
 			return("No data found.")
 		txt = ""
-		template = self.getTabs("{}") * len(data[0]) + "\n"
+		template = gs.getTabs("{}") * len(data[0]) + "\n"
 		txt += template.format(*data[0])
 		for row in data[1:]:
 			txt += template.format(datetime.fromtimestamp(int(row[0])).strftime("%Y-%m-%d %H:%M:%S"), *row[:1])
@@ -312,11 +295,11 @@ class utm(netCommand):
 	def uptime(self):
 		"""Returns the boottime and current uptime."""
 
-		reply  = self.getTabs("Boottime:", 3) + "{}\n".format(datetime.fromtimestamp(float(gs.boottime)).strftime("%Y-%m-%d %H:%M:%S"))
-		reply += self.getTabs("Current time:", 3) + "{}\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+		reply  = gs.getTabs("Boottime:", 3) + "{}\n".format(datetime.fromtimestamp(float(gs.boottime)).strftime("%Y-%m-%d %H:%M:%S"))
+		reply += gs.getTabs("Current time:", 3) + "{}\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 		diff = time.time() - gs.boottime
 		tDiff = gs.timediff(diff)
-		reply += self.getTabs("Uptime:", 3) + "{}d, {}:{}:{}".format(*tDiff)
+		reply += gs.getTabs("Uptime:", 3) + "{}d, {}:{}:{}".format(*tDiff)
 		return(reply)
 
 class hlp(netCommand):
@@ -334,7 +317,7 @@ class hlp(netCommand):
 		if (len(args) == 1):
 			commandlist = "Name\t\tCommand\t\tArguments\n"
 			for comm in sorted(commlist.keys()):
-				commandlist += "\n{0}{1}{2}".format(self.getTabs(commlist[comm].name + ":"), self.getTabs(commlist[comm].command), commlist[comm].args)
+				commandlist += "\n{0}{1}{2}".format(gs.getTabs(commlist[comm].name + ":"), gs.getTabs(commlist[comm].command), commlist[comm].args)
 			return(commandlist)
 		else:
 			arg = args[1]
@@ -418,8 +401,8 @@ class wtr(netCommand):
 						zeit = gs.timediff(int(row[0]) - int(data2[j - 1][0]))
 						results += "\t\tTime since previous watering: {0}d, {1}:{2}:{3}\n".format(*zeit)
 					txt += "\tTime\t\t|Duration\t|Amount\n"
-					txt += "\t{}|{}|{}\n".format(self.getTabs(datetime.fromtimestamp(int(row[0])).strftime("%Y-%m-%d %H:%M:%S")),
-							 self.getTabs(round(row[1], 1)), self.getTabs(row[2]))
+					txt += "\t{}|{}|{}\n".format(gs.getTabs(datetime.fromtimestamp(int(row[0])).strftime("%Y-%m-%d %H:%M:%S")),
+							 gs.getTabs(round(row[1], 1)), gs.getTabs(row[2]))
 				zeit = gs.timediff(time.time() - int(data2[-1][0]))
 				txt += "\t\tTime since last watering: {0}d, {1}:{2}:{3}\n".format(*zeit)
 			else:
@@ -1033,11 +1016,11 @@ class pwr(netCommand):
 				return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 		msg = ""
 		for r in rail:
-			msg += "|{}".format(self.getTabs(r))
+			msg += "|{}".format(gs.getTabs(r))
 		msg += "\n" + "-" * (8 * len(rail)) + "\n"
 		for o in options:
 			for r in rail:
-				msg += "|{}".format(self.getTabs(gs.control.requestData(r + o)))
+				msg += "|{}".format(gs.getTabs(gs.control.requestData(r + o)))
 			msg += "\n"
 		return(msg)
 	
@@ -1104,6 +1087,7 @@ class Server(object):
 		for command in comms:
 			self.commands[command.command] = command
 		gs.server = self
+
 
 	def __makeSocket(self):
 		"""Create a network connection to start the server."""
@@ -1241,11 +1225,13 @@ class Server(object):
 		else:
 			return(0, ["Not a valid command. " + command])
 	
+
 class client(globstuff.protoThread):
 	def run(self):
 		print("Starting thread{0}: {1}".format(self.threadID, self.name))
 		gs.server.clientthread(self.args[0], self.args[1], self.args[2])
 		print("Exiting thread{0}: {1}".format(self.threadID, self.name))
+
 
 class shutdownError(Exception):
 	pass

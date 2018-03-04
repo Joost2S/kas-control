@@ -1,17 +1,22 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.5.04	15-02-2018
+# v0.5.05	03-03-2018
 
 import logging
 
 from globstuff import globstuff as gs
 
 class LEDbar(object):
+	"""
+	Object to control an LEDbar.
+	Option to set some of the LEDs as indicators using binary notation.
+	Can be used if user wants to display more than one value on 1 bar.
+	"""
 	
 	__iPins = []			# List with indicator pin numbers
 	__lPins = []			# List with LED pin numbers
-	__mode = 0				# Select from bar or dot mode. 0, 1
+	__mode = "bar"			# Select from 'bar' or 'dot' mode.
 	__indicator = 0		# Tells user which sensor is displayed from selected range
 	__ledAmount = 0		# Amount of leds in bar
 	__curLEDs = 0			# Current amount of LEDs turned on
@@ -50,7 +55,7 @@ class LEDbar(object):
 			for name in names:
 				self.__names.append(name[0])
 				self.__displayed.append(False)
-				self.__bounds.append([0.85 * name[1], 1.15 * name[2]])
+				self.__bounds.append([0.95 * name[1], 1.05 * name[2]])
 
 	def updateBounds(self, name, low, high):
 		"""Set bound levels based on the channel's trigger values."""
@@ -62,8 +67,10 @@ class LEDbar(object):
 			pass
 
 	def updateBar(self, values, a = 0):
-
-		if (a % len(self.__bounds) == 0 and a > 0):
+		
+		if (self.__mode == "off"):
+			return
+		if (a >= len(self.__bounds)):
 			# If all values are unavailable, turn off all lPins and end.
 			self.__changeLEDs(self.__lPins, False)
 			return
@@ -119,6 +126,7 @@ class LEDbar(object):
 			logging.warning("List of invalid length passed to LEDbar.")
 
 	def __setIpins(self, index):
+		"""Returns the pins that need to be turned on and off in the indicator section."""
 
 		on = []
 		off = []
@@ -139,6 +147,7 @@ class LEDbar(object):
 		return(on, off)
 
 	def __changeLEDs(self, pins, state):
+		"""Turns all given LEDs on or off."""
 
 		changePins = {}
 		for pin in pins:
@@ -149,11 +158,15 @@ class LEDbar(object):
 			gs.getPinDev(dev).output(pinlist, state)
 	
 	def setMode(self, mode):
+		"""Change between bar mode and dot mode."""
 
-		if (mode in ["bar", "dot"]):
+		if (mode in ["bar", "dot", "off"]):
 			if (self.__mode != mode):
 				self.__mode = mode
 				if (mode == "bar"):
 					self.__changeLEDs(self.__lPins[:self.__curLEDs - 2], True)
-				else:
+				elif (mode == "dot"):
 					self.__changeLEDs(self.__lPins[:self.__curLEDs - 2], False)
+				elif (mode == "off"):
+					self.__changeLEDs(self.__lPins, False)
+					self.__changeLEDs(self.__iPins, False)

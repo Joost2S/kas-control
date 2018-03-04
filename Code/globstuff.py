@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.8.20	02-03-2018
+# v0.8.21	03-03-2018
 
 
 from abc import ABCMeta, abstractmethod
@@ -337,6 +337,7 @@ class fan(object):
 	__mcp = None
 	__pin = ""
 	__state = False
+	power = 100
 
 	def __init(self, pin):
 		
@@ -461,6 +462,23 @@ class globstuff:
 		cpu_temp = tempFile.read()
 		tempFile.close()
 		return(round(float(cpu_temp)/1000, 1))
+	
+	def getTabs(txt, tabs = 2, tablength = 8):
+		"""Returns a string of a fixed length for easier formatting of tables. Assuming your console has a tab length of 8 chars."""
+
+		txt = str(txt)
+		size = tabs * tablength
+		if (len(txt) > size):
+			return(txt[:size])
+		elif (len(txt) == size):
+			return(txt)
+		elif (tablength == 8):
+			t = int(size / len(txt))
+			if (size % len(txt) != 0):
+				t += 1
+			return(txt + "\t" * t)
+		else:
+			return(txt + " " * (tabs * tablength - len(txt)))
 
 	def timediff(diff):
 		"""Converts seconds into dd, HH:MM:SS"""

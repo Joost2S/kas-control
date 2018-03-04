@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.6.05	02-03-2018
+# v0.6.06	03-03-2018
 
 import logging
 import threading
@@ -57,7 +57,7 @@ class Group(object):
 		if (self.enabled):
 			return(self.plantName)
 		else:
-			return(self.mstName)
+			return(self.groupname)
 
 	def getM(self):
 		"""Returns the soil moisture level of the associated sensor."""
@@ -103,6 +103,7 @@ class Group(object):
 			result = gs.db.removePlant(self.plantName)
 			self.plantName = None
 			return(result)
+		return("No plant currently assigned to container {}.".format(self.groupname[-1]))
 
 	def addPlant(self, name, type = None):
 		"""\t\tAdd a plant. Only possible of no plant is currently assigned.
@@ -131,8 +132,6 @@ class Group(object):
 			if (gs.control.connCheckValue() <= self.lowtrig < self.hightrig):
 				self.enabled = True
 				gs.db.setTriggers(self.chan, self.lowtrig, self.hightrig)
-				if (gs.hwOptions["ledbars"]):
-					self.__LEDbars["mst"].updateBounds(self.mstName, self.lowtrig, self.hightrig)
 			else:
 				self.enabled = False
 
