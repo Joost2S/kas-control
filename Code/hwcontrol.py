@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.22	03-03-2018
+# v0.9.23	04-03-2018
 
 from collections import OrderedDict
 import csv
@@ -51,7 +51,7 @@ class hwControl(object):
 	__powerQueue = None		# Priority queue to keep track of the powerconsuming devices on the 12v rail.
 	__template = ""			# Template for __currentstats
 	__currentstats = ""		# Latest output of the monitor method. Is formatted for display in console.
-	__rawStats = []			# List with the latest results from sensors.
+	__rawStats = {}			# Dict with the latest results from sensors. {senorName : latestValue}
 	__timeRes = 0.0			# How often the sensors get polled in seconds.
 	__connectedCheckValue = 0	# If value is below this threhold, sensor is considered disconnected
 	__maxPower = 1.6			# Maximum allowed power draw in amps.
@@ -80,7 +80,7 @@ class hwControl(object):
 		if (gs.hwOptions["ledbars"]):
 			self.__tempbar = ["ambientt", "out_shade"]
 		self.__powerQueue = Queue.PriorityQueue()
-		self.__template = self.__setTemplate()
+		self.__setTemplate()
 		self.setTimeRes()
 		gs.control = self
 
@@ -167,6 +167,9 @@ class hwControl(object):
 						data.append([n, val])
 				return(data)
 
+			# Get raw data for displays (LEDbar, LCD, network client).
+			elif (caller == "display"):
+				return(self.__rawStats)
 			# Get all data.
 			else:
 				return(self.__currentstats)
@@ -461,29 +464,33 @@ class hwControl(object):
 		"""Generates the template for the formatted currentstats."""
 
 		lines = []
-		lines.append("{}")	# timestamp
-		lines.append("Plant")
-		lines.append("Mst")
+		lines.append("{time}")
+		lines.append("Plant\t")
+		lines.append("Mst\t")
 		if (gs.hwOptions["flowsensors"]):
-			lines.append("Water")
+			lines.append("Water\t")
 		if (gs.hwOptions["soiltemp"]):
-			lines.append("Temp")
-		for i in range(len(self.__groups)):
-			lines[1] += "|{}"
-			lines[2] += "|{}"
+			lines.append("Temp\t")
+		for g in self.__groups.values():
+			lines[1] += "{" + g.groupname + "}"
+			lines[2] += "{" + g.mstName + "}"
 			if (gs.hwOptions["flowsensors"]):
-				lines[3] += "|{}"
+				lines[3] += "{" + g.flowName + "}"
 			if (gs.hwOptions["soiltemp"]):
-				lines[4] += "|{}"
+				lines[4] += "{" + g.tempName + "}"
 		lines.append("")
 		currentlines = len(lines)
 		lines.append("Light:\tTemps:")
-		if (gs.hwOptions[""]):
+		if (gs.hwOptions["flowsensors"]):
+			hasOtherFlow = False
 			for t in self.__otherSensors:
+				if (self.__sensors[t] == "flow"):
+					hasOtherFlow = True
 				if (self.__sensors[t] in ["temp", "cputemp"]):
 					lines[currentlines + 0] += "\t"
-			lines[currentlines + 0] += "Water:"
-		if (gs.hwOptions[""]):
+			if (hasOtherFlow):
+				lines[currentlines + 0] += "Water:"
+		if (gs.hwOptions["powermonitor"]):
 			for t in self.__otherSensors:
 				if (self.__sensors[t] == "flow"):
 					lines[currentlines + 0] += "\t"
@@ -491,15 +498,15 @@ class hwControl(object):
 		lines.append("")
 		lines.append("")
 		for t in self.__otherSensors:
-			if (len(t) > 6):
-				t = t[:6]
-			lines[currentlines + 1] += "|{}".format(t)
-			lines[currentlines + 2] += "|{}"
+			lines[currentlines + 2] += "{" + t + "}"
+			if (len(t) > 7):
+				t = t[:7]
+			lines[currentlines + 1] += gs.getTabs("|{}".format(t), 1)
 
 		template = ""
 		for l in lines:
 			template += l + "\n"
-		return(template + "\n")
+		self.__template = template + "\n"
 
 	def startMonitor(self):
 		"""Use this function to start monitor to prevent more than 1 instance running at a time."""
@@ -537,62 +544,45 @@ class hwControl(object):
 
 		try:
 			while (gs.running):
-				data = []
+				data = {}
 
 				# Start collecting data.
-				data.append(time.strftime("%H:%M:%S"))
+				data["time"] = time.strftime("%H:%M:%S")
 
 				# Get group data.
-				gn = []	# Group names
-				gm = []	# Group moist data
-				gt = []	# Group temp data
-				gf = []	# Group flow data
 				for g in self.__groups.values():
 					n = g.getName()
 					m, t, f = g.getSensorData()
-					gn.append(n)
-					gm.append(m)
-					gt.append(t)
-					gf.append(f)
+					data[g.groupname] = n
+					data[g.mstName] = m
+					if (gs.hwOptions["soiltemp"]):
+						data[g.tempName] = t
+					if (gs.hwOptions["flowsensors"]):
+						data[g.flowName] = f
 					if (not gs.running):
 						return
 				
 				# Get data from other sensors.
-				bardata = []
-				sdata = []	# Data from the other sensors.
-				for s in self.__otherSensors:
-					if (self.__sensors[s] == "light"):
-						sdata.append(self.requestData(name = s, perc = True))
+				for sname in self.__otherSensors:
+					if (self.__sensors[sname] == "light"):
+						data[sname] = self.requestData(name = sname, perc = True)
 					else:
-						sdata.append(self.requestData(name = s))
-
-				# Sort data to make it available in raw and formatted forms.
-#				data.extend(gn)
-				for i, m in enumerate(gm):
-					data.append(self.__perc(m))
-					if (gs.hwOptions["ledbars"]):
-						gm[i] = self.__perc(m)
-				data.extend(gm)
-				if (gs.hwOptions["soiltemp"]):
-					data.extend(gt)
-				if (gs.hwOptions["flowsensors"]):
-					data.extend(gf)
-				data.extend(sdata)
-				self.__rawStats = data
-
-				# Formatting data.
-				for i, value in enumerate(data):
-					if (i == 0):
-						continue
-					data[i] = gs.getTabs(value, 1, 7)
-				self.__currentstats = self.__template.format(*data)
-
+						data[sname] = self.requestData(name = sname)
+						
 				# Outputting data to availabe outouts:
+				self.__rawStats = data
 				if (gs.hwOptions["lcd"]):
 					self.__setLCD()
 				if (gs.hwOptions["ledbars"]):
-					self.__LEDbars["mst"].updateBar(gn, gm)
-					self.__LEDbars["temps"].updateBar(self.__tempbar, bardata)
+					for bar in self.__LEDbars.values():
+						bar.updateBar()
+					
+				# Formatting data.
+				for name, value in data.items():
+					if (name == "time"):
+						continue
+					data[name] = gs.getTabs("|" + str(value), 1)
+				self.__currentstats = self.__template.format(**data)
 				print(self.__currentstats)
 
 				# Waiting for next interval of timeRes to start next itertion of loop.

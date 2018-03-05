@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.5.05	03-03-2018
+# v0.5.06	04-03-2018
 
 import logging
 
@@ -57,6 +57,10 @@ class LEDbar(object):
 				self.__displayed.append(False)
 				self.__bounds.append([0.95 * name[1], 1.05 * name[2]])
 
+	def getNames(self):
+
+		return(self.__names)
+
 	def updateBounds(self, name, low, high):
 		"""Set bound levels based on the channel's trigger values."""
 		
@@ -66,64 +70,62 @@ class LEDbar(object):
 		except ValueError:
 			pass
 
-	def updateBar(self, values, a = 0):
+	def updateBar(self, a = 0):
 		
 		if (self.__mode == "off"):
 			return
-		if (a >= len(self.__bounds)):
+		if (a >= len(self.__names)):
 			# If all values are unavailable, turn off all lPins and end.
 			self.__changeLEDs(self.__lPins, False)
 			return
-		if (len(values) == len(self.__displayed)):
-			lOn = []
-			lOff = []
-			newLEDs = 0
-			# Get index of currently displayed value and update to new index.
-			try:
-				i = self.__displayed.index(True)
-				self.__displayed[i] = False
-			except ValueError:
-				i = -1
-			if (i == len(values) - 1):
-				i = 0
-			else:
-				i += 1
-			self.__displayed[i] = True
-			# Skip to next value if current value is disabled or sensor data is not available.
-			if (self.__bounds[i][0] == None or isinstance(values[i], str)):
-				self.updateBar(values, a + 1)
-			# Check how many LEDs should be on with new value:
-			if (values[i] < self.__bounds[i][0]):
-				newLEDs = 0
-			elif (values[i] >= self.__bounds[i][1]):
-				newLEDs = len(self.__lPins)
-			else:
-				step = (self.__bounds[i][1] - self.__bounds[i][0]) / len(self.__bounds)
-				low = self.__bounds[i][0] - step
-				newLEDs = int((values[i] - low) / step)
-			# Get lPin changes for dot mode:
-			if (newLEDs != self.__curLEDs and self.__mode == "dot"):
-				lOff.append(self.__curLEDs - 1)
-				lOn.append(newLEDs - 1)
-			elif (newLEDs < self.__curLEDs):
-				# Get lPins to turn off.
-				lOff.extend(self.__lPins[newLEDs - 1 : self.__curLEDs - 1])
-			elif (newLEDs == self.__curLEDs):
-				# No lPins to change.
-				pass
-			elif (newLEDs > self.__curLEDs):
-				# Get lPins to turn on.
-				lOn.extend(self.__lPins[self.__curLEDs - 1 : newLEDs - 1])
-			iOn, iOff = self.__setIpins(i)
-			lOn.extend(iOn)
-			lOff.extend(iOff)
-			self.__curLEDs = newLEDs
-			if (len(lOff) > 0):
-				self.__changeLEDs(lOff, False)
-			if (len(lOn) > 0):
-				self.__changeLEDs(lOn, True)
+		lOn = []
+		lOff = []
+		newLEDs = 0
+		# Get index of currently displayed value and update to new index.
+		try:
+			i = self.__displayed.index(True)
+			self.__displayed[i] = False
+		except ValueError:
+			i = -1
+		if (i == len(self.__names) - 1):
+			i = 0
 		else:
-			logging.warning("List of invalid length passed to LEDbar.")
+			i += 1
+		self.__displayed[i] = True
+		values = gs.control.requestData(caller = "display")
+		# Skip to next value if current value is disabled or sensor data is not available.
+		if (self.__bounds[i][0] == None or isinstance(values[self.__names[i]], str)):
+			self.updateBar(values, a + 1)
+		# Check how many LEDs should be on with new value:
+		if (values[self.__names[i]] < self.__bounds[i][0]):
+			newLEDs = 0
+		elif (values[self.__names[i]] >= self.__bounds[i][1]):
+			newLEDs = len(self.__lPins)
+		else:
+			step = (self.__bounds[i][1] - self.__bounds[i][0]) / len(self.__bounds)
+			low = self.__bounds[i][0] - step
+			newLEDs = int((values[self.__names[i]] - low) / step)
+		# Get lPin changes for dot mode:
+		if (newLEDs != self.__curLEDs and self.__mode == "dot"):
+			lOff.append(self.__curLEDs - 1)
+			lOn.append(newLEDs - 1)
+		elif (newLEDs < self.__curLEDs):
+			# Get lPins to turn off.
+			lOff.extend(self.__lPins[newLEDs - 1 : self.__curLEDs - 1])
+		elif (newLEDs == self.__curLEDs):
+			# No lPins to change.
+			pass
+		elif (newLEDs > self.__curLEDs):
+			# Get lPins to turn on.
+			lOn.extend(self.__lPins[self.__curLEDs - 1 : newLEDs - 1])
+		iOn, iOff = self.__setIpins(i)
+		lOn.extend(iOn)
+		lOff.extend(iOff)
+		self.__curLEDs = newLEDs
+		if (len(lOff) > 0):
+			self.__changeLEDs(lOff, False)
+		if (len(lOn) > 0):
+			self.__changeLEDs(lOn, True)
 
 	def __setIpins(self, index):
 		"""Returns the pins that need to be turned on and off in the indicator section."""

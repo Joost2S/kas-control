@@ -337,7 +337,7 @@ class fan(object):
 	__mcp = None
 	__pin = ""
 	__state = False
-	power = 100
+	power = 65
 
 	def __init(self, pin):
 		

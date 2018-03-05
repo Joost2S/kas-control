@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.12	17-02-2018
+# v0.9.13	04-03-2018
 
 """
 This is a python driver for an i2c MCP23017. python-smbus must be installed for this driver to work.
@@ -121,7 +121,7 @@ class Pin(object):
 			+ "\nintCon: " + str(self.intCon) + "\ndefval: " + str(self.defVal))
 
 class mcp230xx(object):
-
+	
 	# bus
 	@property
 	def bus(self):
@@ -169,7 +169,7 @@ class mcp230xx(object):
 	def regMap(self):
 		return(self.__regMap)
 	@regMap.setter
-	def bus(self, regMap):
+	def regMap(self, regMap):
 		self.__regMap = regMap
 
 	IOCON = {
@@ -209,7 +209,7 @@ class mcp230xx(object):
 			
 
 	@abstractmethod
-	def __checkPinInput(self, input):
+	def checkPinInput(self, input):
 		pass
 	
 	@abstractmethod
@@ -220,7 +220,7 @@ class mcp230xx(object):
 	def engage(self):
 		pass
 	
-	def __setRegisters(self, bank, bankChar = ""):
+	def setRegisters(self, bank, bankChar = ""):
 		
 		# GPIO DIRECTION input/output setup
 		ioDir = 0x00
@@ -279,7 +279,7 @@ class mcp230xx(object):
 
 		if (not self.enabled):
 			try:
-				bank, pin = self.__checkPinInput(pin)
+				bank, pin = self.checkPinInput(pin)
 			except PinValueError:
 				return
 			if (bank == self.GPA and direction):
@@ -311,9 +311,9 @@ class mcp230xx(object):
 				pins = (pins, )
 			for p in pins:
 				try:
-					bank, pin = self.__checkPinInput(p)
+					bank, pin = self.checkPinInput(p)
 				except PinValueError:
-					logging.debug("Output requested on invalid pin {}:{}".format(hex(self.devAddr), pin))
+					logging.debug("Output requested on invalid pin {}:{}".format(hex(self.devAddr), p))
 					continue
 				if (bank == self.GPA):
 					AbankChanged = True
@@ -379,7 +379,7 @@ class mcp230xx(object):
 		"""Call this method to get the most important settings of the given pin."""
 
 		try:
-			bank, pin = self.__checkPinInput(pin)
+			bank, pin = self.checkPinInput(pin)
 			return(bank[pin].showStatus())
 		except PinValueError:
 			logging.debug("Stats requested for invalid pin {}:{}".format(hex(self.devAddr), pin))
@@ -388,7 +388,7 @@ class mcp230xx(object):
 		"""Call this method to see if a pin is high or low."""
 		
 		try:
-			bank, pin = self.__checkPinInput(pin)
+			bank, pin = self.checkPinInput(pin)
 		except PinValueError:
 			logging.debug("State requested for invalid pin {}:{}".format(hex(self.devAddr), pin))
 		register = "GPIOB"
@@ -409,7 +409,7 @@ class mcp230xx(object):
 		if (not self.enabled):
 			if (self.intPin is not None):
 				try:
-					bank, pin = self.__checkPinInput(pin)
+					bank, pin = self.checkPinInput(pin)
 				except PinValueError:
 					return
 				# Check to see if pin is set as output.
@@ -493,7 +493,7 @@ class mcp23008(mcp230xx):
 		else:
 			logging.debug("MCP23017 device on " + hex(self.devAddr) + " is already enabled. Can't change it anymore.")
 	
-	def __checkPinInput(self, input):
+	def checkPinInput(self, input):
 		"""
 		Returns the bank and pin number as int if the pin is valid.
 		Valid pin input values: 0-7
@@ -546,7 +546,7 @@ class mcp23017(mcp230xx):
 		super(mcp23017, self).__init__(devAddr, intPin)
 		self.intPin2 = intPin2
 		self.hasBinput = False		#	True if there is at least one pin in the B bank set as an input.
-		if (intPin1 is not None and intPin2 is not None):
+		if (self.intPin is not None and intPin2 is not None):
 			self.setSetup("MIRROR", False)
 		self.GPB = []
 		# Setting the second interrupt pin on the Raspberry Pi.
@@ -588,8 +588,8 @@ class mcp23017(mcp230xx):
 		if (not self.enabled):
 			print("Init MCP23017 (" + hex(self.devAddr) + ")...")
 		
-			self.__setRegisters(self.GPA, "A")
-			value = self.__setRegisters(self.GPB, "B")
+			self.setRegisters(self.GPA, "A")
+			value = self.setRegisters(self.GPB, "B")
 
 
 			self.bus.write_byte_data(self.devAddr, self.regMap["IOCONA"], value)
@@ -605,25 +605,25 @@ class mcp23017(mcp230xx):
 		else:
 			logging.debug("MCP23017 on " + hex(self.devAddr) + " is already enabled. Can't change it anymore.")
 	
-	def __checkPinInput(self, input):
+	def checkPinInput(self, input):
 		"""
 		Returns the bank and pin number as int if the pin is valid.
 		Valid pin input values: "A0" - "A7", "B0" - "B7"
 		"""
-		
+
 		bank = None
 		pin = -1
 		if (isinstance(input, str)):
 			if (len(input) == 2):
-				if (input[0].upper() is "A"):
+				if (input[0].upper() == "A"):
 					bank = self.GPA
-				elif (input[0].upper() is "B"):
+				elif (input[0].upper() == "B"):
 					bank = self.GPB
 				else:
 					logging.debug("Invalid pin: " + str(input))
 					raise PinValueError
 				try:
-					pin = int(output[1])
+					pin = int(input[1])
 				except ValueError:
 					logging.debug("Invalid pin: " + str(input))	
 					raise PinValueError
