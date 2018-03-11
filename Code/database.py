@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.4.02	02-03-2018
+# v0.4.04	08-03-2018
 
 from collections import OrderedDict
 from datetime import datetime, timedelta
@@ -64,7 +64,8 @@ class Database(object):
 		if (reset):
 			self.__dropTables()
 			self.__resetting = True
-		self.__sensors = gs.control.getDBsensors()
+		for s, t in gs.control.getSensors().items():
+			self.__sensors[s.replace("-", "_")] = t
 		self.__groups = gs.control.getDBgroups()
 		self.__createdb()
 		gs.db = self
@@ -409,7 +410,12 @@ class Database(object):
 
 	def getSensorData(self, start, end = 0.0, names = None, types = None, group = None):
 		"""Returns a 2D array with the sensor data. First row contains the sensor names."""
-		
+		"""
+		SELECT datetime(timestamp, 'unixepoch', 'localtime') as t,
+		sensor1, sensor2, sensor3
+		FROM sensorData WHERE
+		t > '2018-03-05';
+		"""
 		st = float(time.time()) - float(start)*60*60*24
 		if (end > 0):
 			en = "AND timestamp < {};".format(float(time.time()) - float(end)*60*60*24)
@@ -553,15 +559,8 @@ class Database(object):
 		"""This is the main datalogging method. Every %interval minutes the data will be recorded into the database."""
 
 		# Waiting to ensure recordings are synced to __interval
-		while (int(time.time()) % self.__interval != self.__interval - 1):
-			time.sleep(1)
-			if (not gs.running):
-				return
-		while(1):
-			if (int(time.time()) % self.__interval == 0):
-				break
-			else:
-				time.sleep(0.01)
+		if (self.__wait()):
+			return
 
 		# Datalogging loop.
 		while (gs.running):
@@ -574,24 +573,27 @@ class Database(object):
 					txt2 += ", " + str(self.__getValue(n))
 				dbmsg = (txt1 + txt2 + ");")
 				self.__dbWrite(dbmsg)
+			if ((not gs.running) or self.__wait()):
+				return
 
-			# Waiting for next interval of timeRes to start next itertion of loop.
-			while (int(time.time()) % self.__interval != self.__interval - 1):
-				time.sleep(1)
-				if (not gs.running):
-					return
-			while(1):
-				if (int(time.time()) % self.__interval == 0):
-					break
-				else:
-					time.sleep(0.01)
+	def __wait(self):
+		"""Waiting for next interval of timeRes to start next itertion of loop."""
+
+		while (int(time.time()) % self.__interval != self.__interval - 1):
+			time.sleep(1)
+			if (not gs.running):
+				return(True)
+		while(not int(time.time()) % self.__interval == 0):
+			time.sleep(0.01)
 
 	def __getValue(self, name):
 		"""Takes a measurement of the value on the corresponding type and channel requested."""
 
 		for i in range(5):
-			data = gs.control.requestData(name = name, caller = "db")
+			data = gs.control.requestData(name = name.replace("_", "-"), caller = "db")
 			if (data is not False):
+				if (data is None):
+					return("null")
 				return(data)
 		logging.warning("Failed to get a measurement for sensor {}.".format(name))
 		return("NULL")
@@ -613,74 +615,3 @@ class Datalog(globstuff.protoThread):
 
 class dbVaildationError(Exception):
 	pass
-
-if __name__ == "__main__":
-	import random
-
-	def wtrEvent(group):
-		global db
-		start = time.time() - ((12 + random.random() * 12) * 3600)
-		end = start + (5 + random.random() * 5)
-		amount = 3000 + int(random.random() * 3000)
-		db.wateringEvent(group, start, end, amount)
-
-
-	print()
-	db = Database(reset = True)
-	
-	db.addPlant("plaNT", 1)
-	for i in range(25):
-		wtrEvent(1)
-	db.addPlant("haze", 2, "Weed")
-	
-	for i in range(25):
-		wtrEvent(2)
-	db.addPlant("chili", 1, "Chili pepper")
-	db.addPlant("White Widow", 4, "Weed")
-	for i in range(25):
-		wtrEvent(4)
-	db.addPlant("Pumpkin", 3, "PumPKin")
-	db.addPlant("Tomato", 2, "Tomato")
-	db.removePlant("moi")
-	db.removePlant("plant")
-	db.removePlant("plant")
-	db.addPlant("NoRthern LIghts", 1, "WeED")
-	db.removePlant("TomatO")
-	db.addPlant("chili", 2, "Chili pepper")
-	db.removePlant("haze")
-	db.addPlant("Tomato", 2, "Tomato")
-	db.removePlant(4)
-	db.removePlant("WhitE wIDow")
-	a = "JalapeÑo"
-	db.addPlant(a, 4, "Chili pepper")
-	db.removePlant(2)
-	db.addPlant("drakenboompje", 2, "TREE")
-	for i in range(-4, 6):
-		db.addPlant("tomATO", i, "TOMato")
-	db.removePlant(1)
-	db.addPlant("I am with stupid -->", 1, "I AM LEGEND!!!!111!!11oneoneone!1one11one")
-	for i in range(25):
-		wtrEvent(1)
-		wtrEvent(3)
-	db.removePlant(1)
-	db.addPlant("Kush", 1, "WeeD")
-	for i in range(25):
-		wtrEvent(1)
-	db.removePlant("drakenboompjE")
-	db.removePlant(2)
-	db.removePlant("drakenboompjE")
-	for i in range(4):
-		db.setTriggers(i + 1, 3000 + random.random() * 100, 3500 + random.random() * 100)
-	for i in range(4):
-		db.getTriggers("group" + str(i + 1))
-	for i in range(25):
-		wtrEvent(2)
-	db.addPlant("NuMex Twilight", 2, "Chili pepper")
-	for i in range(25):
-		wtrEvent(2)
-	db.removePlant("pumpkin")
-	db.addPlant("frisian dew", 3, "WEED")
-	db.setTriggers(3, 3000 + random.random() * 100, 3500 + random.random() * 100)
-	
-	db.getData()
-#	db.getData(True)

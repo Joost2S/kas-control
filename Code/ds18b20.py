@@ -1,19 +1,12 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.4.1	06-01-2018
+# v1.4.2	08-03-2018
 
 """
-Small library to control and use the DS18B20 temperature sensor.
+Small module to control and use the DS18B20 temperature sensor.
 Run getTdev to get a list of all the sensors, then make a ds18b20 object for each sensor.
 Objects can be set with a name, or a name can be set later.
-"""
-"""
-000006d218ac = school
-000007c0d519 = kas_mam
-03168bf394ff = thuis_buiten
-0516b50d41ff = thuis_binnen
-0416c170a7ff = WindowPlanter_board
 """
 
 import glob
@@ -78,12 +71,12 @@ class tdevManager(object):
 	def __getTdevs(self):
 		"""Returns a list with the location of each DS18B20 temp sensor."""
 
-		with glob.glob("/sys/bus/w1/devices/28*") as devicelist:
-			if (devicelist == None):
-				logging.warning("No temp devices found.")
-				return(None)
-			for d in devicelist:
-				self.__devAddrs.append(d[-12:])
+		devicelist = glob.glob("/sys/bus/w1/devices/28*")
+		if (devicelist is None):
+			logging.warning("No temp devices found.")
+			return(None)
+		for d in devicelist:
+			self.__devAddrs.append(d[-12:])
 
 	def getTdevList(self):
 		return(self.__devAddrs)
@@ -133,23 +126,3 @@ if __name__ == "__main__":
 			time.sleep(5)
 		except KeyboardInterrupt:
 			sys.exit()
-
-	"""
-	names = getTdev()
-	tdevList = []
-	for i, tdev in enumerate(names):
-		print(tdev)
-		tdevList.append(ds18b20(tdev, "temp" + str(i)))
-	del(names)
-	while(1):
-		try:
-			line1 = ""
-			line2 = ""
-			for dev in tdevList:
-				line1 += dev.name + "\t|"
-				line2 += str(dev.getTemp()) + "\t\t|"
-			print(line1 + "\n" + line2)
-			time.sleep(5)
-		except KeyboardInterrupt:
-			sys.exit()
-	"""

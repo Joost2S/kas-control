@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.8.21	03-03-2018
+# v0.8.22	08-03-2018
 
 
 from abc import ABCMeta, abstractmethod
@@ -372,6 +372,11 @@ class globstuff:
 				  "fan" : True,
 				  }
 
+	defaultLCDsensors = [["soil_g1", "sl-1"], ["soil_g2", "sl-2"], ["soil_g3", "sl-3"],
+							["soil_g4", "sl-4"], ["soil_g5", "sl-5"], ["soil_g6", "sl-6"],
+							["ambientt", "Tin"], ["sun", "Tout"], ["board", "brd"], ["CPU", "cpu"],
+							["5vc", "5vc"], ["12vc", "12vc"], ["total", "wtr"]]
+
 	# Locations of files.
 	dataloc = str(os.path.dirname(os.path.realpath(__file__))) + "/datafiles/"
 	sensSetup = dataloc + "sensorSetup.csv"
@@ -411,7 +416,7 @@ class globstuff:
 	testmode = False					# Disables certain features for diagnositc purposes.
 	time.sleep(0.5)					# Make sure some time has passed so the system clock is updated after boot.
 	boottime = time.time()			# Record boot time to display system uptime.
-	running = True						# Set to False to enable shutdown
+	running = True						# Set to False to start shutdown
 	shutdownOpt = None				# Set shutdown mode.
 
 	# Initiate MCP23017 GPIO expanders:

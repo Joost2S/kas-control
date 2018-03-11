@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.23	04-03-2018
+# v0.10.01	10-03-2018
 
 from collections import OrderedDict
 import csv
@@ -19,6 +19,7 @@ import globstuff
 import group
 import hd44780
 import ina219
+import lcdcontrol
 import ledbar
 import mcp3x08
 import powerLEDs
@@ -43,7 +44,7 @@ class hwControl(object):
 	__plcontroller = None	# Reference to powerLED controller
 	__pump = None				# Reference to pump object.
 	__floatSwitch = None		# Reference to floatSwitch object
-	__LCD = None				# Reference to an hd44780 16x02 or 20x04 LCD
+	LCD = None				# Reference to LCDcontrol module for HD44780 device.
 	__LEDbars = {}				# Reference to some LEDbars.
 	__tempbar = []				# List of sensor names for the temperature LEDbar
 	__fan = None				# Reference to fan object.
@@ -71,8 +72,8 @@ class hwControl(object):
 		if (gs.hwOptions["floatswitch"]):
 			self.__floatSwitch = globstuff.floatUp(gs.float_switch, self.__pump, self.__statusLED)
 		if (gs.hwOptions["lcd"]):
-			self.__LCD = hd44780.Adafruit_CharLCD(gs.LCD_RS, gs.LCD_E, gs.LCD4, gs.LCD5, gs.LCD6, gs.LCD7, *gs.LCD_SIZE, gs.LCD_L, initial_backlight = 0)
-			self.__LCD.enable_display(True)
+			lcd = hd44780.Adafruit_CharLCD(gs.LCD_RS, gs.LCD_E, gs.LCD4, gs.LCD5, gs.LCD6, gs.LCD7, *gs.LCD_SIZE, gs.LCD_L, initial_backlight = 0)
+			self.LCD = lcdcontrol.lcdController(lcd)
 		if (gs.hwOptions["powermonitor"]):
 			self.__plcontroller = powerLEDs.PowerLEDcontroller()
 		if (gs.hwOptions["fan"]):
@@ -86,31 +87,40 @@ class hwControl(object):
 
 
 	def requestData(self, type = None, name = None, caller = None, perc = False):
-		"""Main method for getting sensor data."""
+		"""
+		Main method for getting sensor data.
+		Be aware that calling this method with different arguments will result in
+		different types of variables being returned and even calling it with the
+		same arguments may result in different types being returned at different times.
+		"""
 
 		if (self.__spoof):
 			return(self.__getSpoofData(type, name, caller))
 		try:
 			# Get data from specific sensor.
 			if (name is not None):
+				name = name.replace("_", "-")
 				if (name in self.__sensors.keys()):
 					if (type is not None and type is not self.__sensors[name]):
 						return("Sensor {} is not of type {}.".format(name, type))
 					type = self.__sensors[name][1]
 					if (type == "mst"):
-						if (caller in ["db", "wtr"]):
-							return(self.__adc.getMeasurement(name))
-						else:
-							for g in self.__groups.values():
-								if (g.mstName == name):
-									if (not g.connected):
-										return("N/C")
-									elif (g.watering):
-										return("Busy")
-									elif (not g.enabled):
-										return("NoPlant")
-									else:
-										return(self.__adc.getMeasurement(name, perc))
+						for g in self.__groups.values():
+							if (g.mstName == name):
+								if (caller in ["db", "wtr"]):
+									if (not g.enabled):
+										return(None)
+									if (not g.connected and caller == "db"):
+										return(None)
+									return(self.__adc.getMeasurement(name))
+								if (not g.connected):
+									return("N/C")
+								elif (g.watering):
+									return("Busy")
+								elif (not g.enabled):
+									return("NoPlant")
+								else:
+									return(self.__adc.getMeasurement(name, perc))
 						return(None)
 					if (type == "light"):
 						return(self.__adc.getMeasurement(name, perc))
@@ -391,7 +401,7 @@ class hwControl(object):
 							if (curType == "ledbar"):
 								if (gs.hwOptions["ledbars"]):
 									try:
-										self.__LEDbars[output[0]] = ledbar.LEDbar(output[1], output[2:])
+										self.__LEDbars[output[0]] = ledbar.LEDbar(output[2:], output[1])
 									except Exception as msg:
 										logging.error(msg)
 										raise Exception
@@ -460,6 +470,17 @@ class hwControl(object):
 		self.__sensors[output[0] + "c"] = "pwr"
 		self.__otherSensors[output[0] + "c"] = "pwr"
 		
+	def __setLEDbars(self):
+		"""Sets the values and bounds for the LEDbars to display."""
+		
+		self.__LEDbars["temps"] = LEDbar(gs.leds1, 1)
+		self.__LEDbars["temps"].setNames([["board", 18, 27], ["ambientt", 18, 27]])
+		self.__LEDbars["mst"] = LEDbar(gs.leds2, 3)
+		barnames = []
+		for i in range(6):
+			barnames.append(["soil_g" + str(i+1), 10, 60])
+		self.__LEDbars["mst"].setNames(barnames)
+
 	def __setTemplate(self):
 		"""Generates the template for the formatted currentstats."""
 
@@ -538,9 +559,17 @@ class hwControl(object):
 		
 		#	Indicate to user that the system is up and running.
 		if (gs.hwOptions["lcd"]):
-			self.__LCD.set_backlight(1)
+			self.LCD.set_backlight(1)
+			msg  = "   Welcome to   \n"
+			msg += "   Kas-Control  "
+			if (gs.LCD_SIZE[1] == 4):
+				msg = "\n" + msg
+			self.LCD.message(msg)
+			self.LCD.setNames(gs.defaultLCDsensors)
 		else:
 			self.__statusLED.blinkSlow(3)
+		if (gs.hwOptions["ledbars"]):
+			self.__setLEDbars()
 
 		try:
 			while (gs.running):
@@ -572,7 +601,7 @@ class hwControl(object):
 				# Outputting data to availabe outouts:
 				self.__rawStats = data
 				if (gs.hwOptions["lcd"]):
-					self.__setLCD()
+					self.LCD.updateScreen()
 				if (gs.hwOptions["ledbars"]):
 					for bar in self.__LEDbars.values():
 						bar.updateBar()
@@ -590,11 +619,8 @@ class hwControl(object):
 					time.sleep(1)
 					if (not gs.running):
 						return
-				while (1):
-					if (int(time.time()) % self.__timeRes == 0):
-						break
-					else:
-						time.sleep(0.01)
+				while (not int(time.time()) % self.__timeRes == 0):
+					time.sleep(0.01)
 				# End of loop
 
 		except KeyboardInterrupt:
@@ -620,10 +646,10 @@ class hwControl(object):
 					logging.debug("{} disabled".format(g.groupname))
 				else:
 					logging.debug("{} enabled".format(g.groupname))
-			
-	def __setLCD(self, values):
+				
+	def lcdNames(self, names):
 
-		pass
+		self.LCD.names(names)
 
 	def powerLEDtoggle(self, channel):
 		"""Toggle powerLED channel. Can only turn on if channel is set."""
@@ -704,13 +730,10 @@ class hwControl(object):
 			data[n] = names
 		return(data)
 	
-	def getDBsensors(self):
+	def getSensors(self):
 		"""Data for setting up database."""
 
-		sensors = OrderedDict()
-		for s, t in self.__sensors.keys():
-			sensors[s.replace("-", "_")] = t
-		return(sensors)
+		return(self.__sensors)
 
 	def getDBcheckData(self):
 		"""Returns a table to be compared with the sensor setup in the database as integrity check."""
@@ -732,6 +755,13 @@ class hwControl(object):
 
 		for bar in self.__LEDbars.values():
 			bar.setMode(mode)
+
+	def getLEDbarConfig(self):
+
+		data = []
+		for name, bar in self.__LEDbars.items():
+			data.append(name)
+			data.append(bar.getConfig())
 
 	def getADCres(self):
 		"""Returns the resultion of the installed ADC."""
@@ -761,16 +791,17 @@ class hwControl(object):
 
 	def shutdown(self):
 		"""Reset and turn off all in- and outputs when shutting down the system."""
-
+		
+		if (gs.hwOptions["lcd"]):
+			self.LCD.enable_display(False)
 		self.__statusLED.off()
 		self.__pump.disable()
 		# Turn off valve in each Group.
 		for g in self.__groups.values():
 			g.valve.off()
 		# reset INA219 devices if option.
-		if (gs.hwOptions["lcd"]):
-			self.__LCD.enable_display(False)
-		# Turn off LCD if option.
+		for ina in self.__ina.values():
+			ina.reset()
 		if (gs.hwOptions["status LED"]):
 			self.__statusLED.disable()
 			

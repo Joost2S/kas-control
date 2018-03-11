@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.9.13	04-03-2018
+# v0.10.0	04-03-2018
 
 """
 This is a python driver for an i2c MCP23017. python-smbus must be installed for this driver to work.

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.1.03	09-02-2018
+# v0.3.00	09-03-2018
 
 # For details, see datasheet: http://www.ti.com/lit/ds/symlink/ina219.pdf
 
@@ -92,6 +92,13 @@ class INA219(object):
 			self.__engaged = True
 		else:
 			logging.debug("INA219 device on addr " + hex(self.devAddr) + " is already enabled.")
+
+	def reset(self):
+
+		if (self.__engaged):
+			self.__engaged = False
+			self.bus.write_byte_data(self.devAddr, self.regMap["config"], 0x399F)
+			self.bus.write_byte_data(self.devAddr, self.regMap["calibration", 0x00])
 
 	def getCurrent(self):
 

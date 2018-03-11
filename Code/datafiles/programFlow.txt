@@ -3,6 +3,7 @@
 	- init on import of globstuff -->
 		- init of GPIO expanders
 	- init hwcontrol -->
+		#-- All objects that need GPIO pins are required to set those in the init.
 		- init adc
 		- set connectedValue as .05 * adc resolution
 		- init tempManager

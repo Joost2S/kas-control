@@ -1,10 +1,9 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.1.05	03-03-2018
+# v1.1.07	09-03-2018
 
 from abc import ABCMeta, abstractmethod
-import csv
 from datetime import datetime
 import logging
 import socket
@@ -934,6 +933,26 @@ class cth(netCommand):
 			return(gs.db.getContainerHistory(chan))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 	
+class sen(netCommand):
+
+	def __init__(self):
+		self.command = "sensors"
+		self.name = "Sensor list"
+		self.args = None
+		self.help = "Returns a list with all sensors and some metadata per sensor.\n"
+
+	def runCommand(self, args):
+
+		slist = gs.control.getDBcheckData()
+		msg = ""
+		for item in ["|Name", "|Type", "|Group", "|Resolution"]:
+			msg += gs.getTabs(item)
+		msg += "\n"
+		for row in slist:
+			for item in row:
+				msg += gs.getTabs("|" + item)
+		return(msg)
+
 class led(netCommand):
 
 	def __init__(self):
@@ -1029,16 +1048,78 @@ class lbm(netCommand):
 	def __init__(self):
 		self.command = "barmode"
 		self.name = "LEDbar mode"
-		self.args = "%mode"
-		self.help = "Change LEDbar mode to 'bar' or 'dot'.\n"
+		self.args = "%mode%"
+		self.help = "Change LEDbar mode to 'bar', 'dot' or 'off'.\n"
+		self.help += "If no argument is given, the current configuration is returned."
+	
+	def runCommand(self, args = None):
+
+		if (args is not None):
+			if (args[0] in ["bar", "dot", "off"]):
+				gs.control.setLEDbarMode(args[0])
+				return("LEDbars set to: {}".format(args[0]))
+			return("Not a valid mode for LEDbars.")
+		msg = ""
+		for item in gs.control.getLEDbarConfig():
+			if (isinstance(item, str)):
+				msg += item + ":\n"
+			else:
+				for item in ["|Name", "|Displayed", "|Low", "|High"]:
+					msg += gs.getTabs(item)
+				msg += "\n"
+				for row in slist:
+					for item in row:
+						msg += gs.getTabs("|" + item)
+					msg += "\n"
+		return(msg)
+
+class lcd(netCommand):
+
+	def __init__(self):
+		self.command = "lcd"
+		self.name = "LCD settings"
+		self.args = "%setting\t%arguments%"
+		self.help = "Change settings for the LCD display.\n"
+		self.help += "%setting:\n"
+		self.help += "light:\tToggle the backlight on or off.\n"
+		self.help += "sensors:\tEnter the names of the sensors to be displayed.\n"
+		self.help += "\tMore names can de entered than can be displayed.\n"
+		self.help += "\tFormat must be: 'sensorname:displayname'.\n"
+		self.help += "\tOr: 'sensorname'. Last 4 characters will be used as displayname.\n"
+		self.help += "\tEnter command 'sensors' to get a full list of available sensors.\n"
+		self.help += "msg:\tEnter a message to be displayed. Set a time in seconds to display the message.\n"
+		self.help += "\tFollowed by the message.\n"
+		self.help += "mode:\tTo be implemented in the future.\n"
+		self.help += "\tsensor:\tDisplays latest sensor readouts of selected sensors.\n"
+		self.help += "\ttoggle\tToggle the LCD on or off.\n"
+		self.help += "\n"
 
 	def runCommand(self, args = None):
 
 		if (args is not None):
-			if (args[0] in ["bar", "dot"]):
-				gs.control.setLEDbarMode(args[0])
-				return("LEDbars set to: {}".format(args[0]))
-			return("Not a valid mode for LEDbars.")
+			if (not args[0] in ["light", "sensors", "msg", "mode"]):
+				return("Not a valid LCD command.")
+			if (args[0] == "light"):
+				state = gs.control.LCD.toggleBacklight()
+				return("Turned backlight state to {}.".format(state))
+			if (args[0] == "sensors"):
+				if (len(args) > 1):
+					pass
+					# extract names and display names from args.
+				return("Enter names of sensors to display on the LCD.")
+			if (args[0] == "msg"):
+				if (len(args) > 1):
+					try:
+						t = int(args[1])
+						del(args[1])
+					except ValueError:
+						t = 15
+					if (len(args) > 1):
+						msg = ""
+						for arg in args[1:]:
+							msg += arg + " "
+						gs.control.LCD.message(msg[:-1], t)
+						return("Message set.")
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 				
 
@@ -1078,12 +1159,14 @@ class Server(object):
 					spf(), flt(), pst(),
 					set(), get(), gra(),
 					log(), adp(), rmp(),
-					cth()  ]
+					cth(), sen()]
 		if (gs.hwOptions["powermonitor"]):
 			comms.extend([led(), stl(),
 					pwr()])
 		if (gs.hwOptions["ledbars"]):
 			comms.extend([lbm()])
+		if (gs.hwOptions["lcd"]):
+			comms.extend([lcd()])
 		for command in comms:
 			self.commands[command.command] = command
 		gs.server = self
