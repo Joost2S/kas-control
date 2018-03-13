@@ -12,7 +12,9 @@ Features
 - Default 3 temperature sensors are supported by the board. Software supports infinite sensors. Make a simple breakout (connect parallel) board for more sensors.
 - Light sensor for ambient light measurement.
 - Float switch for use in a water container.
-- ~~Standard HD44780 16x2 or 20x4 character LCD with drivers kindly copied from ADAfruit.~~ Haven't tested yet.
+- Outputs:
+  - 2 configurable LEDbars.
+  - Standard HD44780 16x2 or 20x4 character LCD with driver kindly copied from ADAfruit.
 - Network client to set the various setting and get the data.
   - Command-line only. Graph makes a Google graph html file that will open in a new tab in your browser
   - Basic encryption is implemented with openSSL
@@ -21,10 +23,10 @@ Features
   - Add a name and plant type to keep track of which plants you've grown
 - 5v/12v 4A PSU PCB with INA219 power monitor. PCB files are available, haven't tested it yet.
   - 4 powerLED connectors are available for 350/500/700mA powerLED strips.
+  - Power monitoring is available via INA219 ICs
   
 Future Features
 ---------------
-- 2 configurable LEDbars.
 - Network
   - Full-fledged GUI for the network client.
   - rPi camera support so you can watch your plants from all over the world
