@@ -28,11 +28,11 @@ Features
 Future Features
 ---------------
 - Network
-  - Full-fledged GUI for the network client.
+  - Full-fledged GUI for the network client. Probably built on Kivy.
   - rPi camera support so you can watch your plants from all over the world
 - Database
   - Adding results such as plant size or harvest amount to each of your plants. Manual input only of course.
-- Use eventhooks
+- Implement event system
 
 Motivation
 ----------
@@ -48,6 +48,7 @@ Installation/requirements
 - SMBus for i2c
 - spidev for SPI
 - SQlite for database
+- Kivy (future)
 
 
 Contributors
