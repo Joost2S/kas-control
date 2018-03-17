@@ -196,8 +196,8 @@ class Database(object):
 		
 		# Gathering data for plantTypes table...
 		plantTData = []
-		for type in self.__species:
-			plantTData.append("INSERT INTO plantTypes(species) VALUES('{}');".format(type.title()))
+		for s in self.__species:
+			plantTData.append("INSERT INTO plantTypes(species) VALUES('{}');".format(s.title()))
 
 		# Creating watering table...
 		watering  = "CREATE TABLE watering ("
@@ -245,7 +245,7 @@ class Database(object):
 		self.lastPlant = name
 		try:
 			group = int(group)
-		except:
+		except ValueError:
 			group = int(group[-1])
 		if (not (0 < group <= len(self.__groups))):
 			self.lastResult = False
@@ -290,16 +290,14 @@ class Database(object):
 		dbmsg1 += "FROM groups "
 		dbmsg1 += "INNER JOIN plants ON groups.plantID = plants.plantID "
 		# Select by plant name or integer of container.
-		if (isinstance(plantName, str)):
+		try:
+			if (0 < int(plantName) <= len(self.__groups)):
+	#			print("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
+				dbmsg1 += "WHERE groups.groupID = {};".format(plantName)
+		except ValueError:
 			plantName = plantName.title()
 			self.lastPlant = plantName
 			dbmsg1 += "WHERE plants.name = '{}';".format(plantName)
-		else:
-			if (not (0 < group <= len(self.__groups))):
-				print("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
-				return(False)
-			self.lastPlant = "Unknown"
-			dbmsg1 += "WHERE groups.groupID = {};".format(plantName)
 		with (self.__tlock):
 			conn = sql.connect(self.__fileName)
 			with conn:
@@ -383,11 +381,12 @@ class Database(object):
 		subquery = "(SELECT plantID FROM groups WHERE groupID = {})".format(group)
 		query = "SELECT lowertrig, uppertrig FROM plants WHERE plantID = {};".format(subquery)
 		triggers = self.__dbRead(query)
+		return(triggers[0])
 
 	def setTriggers(self, group, lower = None, upper = None):
 		"""Set one or both triggers of a container."""
-		
-		if (not (0 < group <= len(self.__groups))):
+
+		if (not group in self.__groups.keys()):
 			self.lastResult = False
 			print("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
 			return
@@ -479,8 +478,6 @@ class Database(object):
 #			finally:
 #				conn.close()
 		return(dat)
-		for line in dat:
-			self.__printutf(line)
 			
 	def __dbWrite(self, *dbmsgs):
 		"""Use this method to write data to the DB."""
@@ -488,7 +485,6 @@ class Database(object):
 		sortedmsgs = self.__sortmsgs(*dbmsgs)
 
 		try:
-			updRows = 0
 			with (self.__tlock):
 				conn = sql.connect(self.__fileName)
 				with conn:
@@ -500,8 +496,8 @@ class Database(object):
 			if (updRows > 1):
 				print("updRows:", updRows)
 		except sql.Error as er:
-			 logging.debug("er:", er.message)
-			 return(0)
+			logging.debug("er:", er.message)
+			return(0)
 		return(updRows)
 		
 	def __sortmsgs(self, *dbmsgs):
@@ -565,7 +561,6 @@ class Database(object):
 		# Datalogging loop.
 		while (gs.running):
 			if (not self.pause):
-				start = time.time()
 				txt1 = "INSERT INTO sensorData(timestamp"
 				txt2 = ")VALUES({}".format(int(time.time()))
 				for n in self.__sensors.keys():

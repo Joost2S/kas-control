@@ -7,7 +7,7 @@
 Client for Kas control software.
 """
 
-import os 
+import os
 import socket
 import ssl
 import sys

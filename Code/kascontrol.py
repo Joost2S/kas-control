@@ -21,7 +21,7 @@ logging.basicConfig(level = logging.DEBUG,
 						  format = "%(asctime)s - [%(levelname)s] - %(threadName)s - %(message)s",
 						  datefmt = "%m-%d %H:%M:%S",
 						  filename = gs.logfile)
-						  
+
 try:
 	# Initiating major modules:
 	hwcontrol.hwControl()
@@ -37,17 +37,17 @@ try:
 	for mcp in gs.mcplist:
 		mcp.engage()
 		
-	#	Start monitoring the soil and other sensors.
+	# Start monitoring the soil and other sensors.
 	powerManager = hwcontrol.PowerManager(gs.getThreadNr(), "PowerManager")
 	gs.draadjes.append(powerManager)
 	powerManager.start()
 
-	#	 Start recording the sensor data to the DB.
+	# Start recording the sensor data to the DB.
 	datalog = database.Datalog(gs.getThreadNr(), "Datalog")
 	gs.draadjes.append(datalog)
 	datalog.start()
 
-	#	Start monitoring the soil and other sensors.
+	# Start monitoring the soil and other sensors.
 	monitor = hwcontrol.Monitor(gs.getThreadNr(), "Monitor")
 	gs.draadjes.append(monitor)
 	monitor.start()

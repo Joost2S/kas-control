@@ -150,7 +150,7 @@ class LEDbar(object):
 
 		data = []
 		for i, name in enumerate(self.names):
-			data.extend([name, self.displayed[i], self.bounds[0], self.bounds[1]])
+			data.extend([name, self.displayed[i], self.bounds[i][0], self.bounds[i][1]])
 		return(data)
 
 	def updateBar(self, a = 0):

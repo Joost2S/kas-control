@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.6.06	03-03-2018
+# v0.6.07	16-03-2018
 
 import logging
 import threading
@@ -15,13 +15,13 @@ class Group(object):
 
 	groupname = ""
 	mstName = ""
-	connected
+	connected = None
 	enabled = False
-	watering
-	below_range
-	__lowtrig
-	__hightrig
-	valve
+	watering = None
+	below_range = None
+	__lowtrig = None
+	__hightrig = None
+	valve = None
 	__lock = None
 	flowName = None
 	tempName = None
@@ -45,8 +45,8 @@ class Group(object):
 	
 
 	def getSensorData(self):
-		
-		moist = self.getM()
+
+		soil = self.getM()
 		temp = self.getT()
 		flow = self.getF()
 		return(soil, temp, flow)
@@ -69,7 +69,7 @@ class Group(object):
 					if (moist <= self.lowtrig and gs.control.isPumpEnabled()):
 						self.below_range += 1
 						if (self.below_range >= 5):
-							wt = wateringthread(gs.getThreadNr(), "watering" + str(self.groupname[-1]), args = self)
+							wt = WateringThread(gs.getThreadNr(), "watering" + str(self.groupname[-1]), args = self)
 							wt.start()
 							gs.wtrThreads.append(wt)
 							self.below_range = 0
@@ -109,7 +109,7 @@ class Group(object):
 		"""\t\tAdd a plant. Only possible of no plant is currently assigned.
 		Channel will be enabled when new trigger levels are set."""
 
-		if (not self.enabled and self.plantName == None):
+		if (not self.enabled and self.plantName is None):
 			name = str(name).title()
 			gs.db.addPlant(name, self.groupname, type)
 			self.plantName = name
@@ -131,7 +131,7 @@ class Group(object):
 			# If both triggers are valid, re-enable the channel and write new value(s) to DB.
 			if (gs.control.connCheckValue() <= self.lowtrig < self.hightrig):
 				self.enabled = True
-				gs.db.setTriggers(self.chan, self.lowtrig, self.hightrig)
+				gs.db.setTriggers(self.groupname, self.lowtrig, self.hightrig)
 			else:
 				self.enabled = False
 
@@ -168,7 +168,7 @@ class Water(object):
 			self.group.flowName.requestData(self)
 		start = round(time.time(), 2)
 		t = 1
-		while (gs.adc.getMeasurement(self.group.groupname, 0) < self.group.hightrig):
+		while (gs.control.requestData(self.group.groupname, caller="wtr") < self.group.hightrig):
 			gs.control.requestPumping(self.group.groupname, t)
 			if (not self.group.connected or t == 3):
 				break

@@ -1,7 +1,26 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v1.1.07	09-03-2018
+# v1.1.08	16-03-2018
+
+"""
+Template for making a new net command:
+
+class cmd(netCommand):
+
+	def __init__(self):
+		super().__init__()
+		self.command = "command"
+		self.name = "Command"
+		self.args = ""
+		self.help = ""
+		self.help += ""
+		
+	def runCommand(self, args = None):
+		if (args is not None):
+			pass
+		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
+"""
 
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
@@ -11,13 +30,15 @@ import ssl
 import threading
 import time
 
+import globstuff
 from globstuff import globstuff as gs
 
-class netCommand(object):
+
+class NetCommand(object):
 	"""Base object for commands available through the network interface."""
 
 	__metaclass__ = ABCMeta
-	 
+
 	# command
 	@property
 	def command(self):
@@ -32,7 +53,7 @@ class netCommand(object):
 	@name.setter
 	def name(self, name):
 		self.__name = name
-	# helpShort
+	# args
 	@property
 	def args(self):
 		return(self.__args)
@@ -49,8 +70,7 @@ class netCommand(object):
 	
 	@abstractmethod
 	def __init__(self):
-		pass
-		#return super().__init__(**kwargs)
+		super().__init__()
 	
 	@abstractmethod
 	def runCommand(self, args = None):
@@ -61,7 +81,7 @@ class netCommand(object):
 		try:
 			if (not (0 < int(container) <= gs.control.grouplen())):
 				raise Exception
-		except:
+		except ValueError:
 			return(False, "Enter valid channel. (1 - {0})".format(gs.control.grouplen()))
 		return(True, "group" + str(container))
 
@@ -82,9 +102,10 @@ class netCommand(object):
 	def returnHelp(self):
 		return(self.help)
 
-class ext(netCommand):
+class ext(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "exit"
 		self.name = "Exit"
 		self.args = "'-s'\t'-r'\t'-x'"
@@ -116,9 +137,10 @@ class ext(netCommand):
 		ssock.connect(("127.0.0.1", gs.port))
 		ssock.close()
 
-class cur(netCommand):
+class cur(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "cur"
 		self.name = "Current stats"
 		self.args = None
@@ -127,9 +149,10 @@ class cur(netCommand):
 	def runCommand(self, args = None):
 		return(gs.control.requestData())
 
-class tem(netCommand):
+class tem(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "temp"
 		self.name = "Temperature"
 		self.args = "%name%"
@@ -143,9 +166,9 @@ class tem(netCommand):
 			if (temp is None):
 				return("Invalid tempsensor.")
 			elif (temp == False):
-				return("Error retrieving temperature for sensor {}. See log for details.".format(output[0]))
+				return("Error retrieving temperature for sensor {}. See log for details.".format(args[0]))
 			else:
-				return("{} : {}".format(args[0]), temp)
+				return("{} : {}".format(args[0], temp))
 		txt = "Sensor\t\t| value\n"
 		data = gs.control.requestData("temp")
 		if (len(data) > 0):
@@ -155,9 +178,10 @@ class tem(netCommand):
 			txt = "No temperature devices found."
 		return(txt)
 
-class mst(netCommand):
+class mst(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "mst"
 		self.name = "Moisture level"
 		self.args = "%group"
@@ -183,7 +207,7 @@ class mst(netCommand):
 				if (not check):
 					return(chan)
 				return(gs.control.requestData(chan, "mst"))
-		return("Enter a groupnumber. (1 - " + str(len(gs.ch_list)) + ").")
+		return("Enter a group number. (1 - " + str(len(gs.control.grouplen())) + ").")
 
 	def listConnected(self):
 		list = ""
@@ -196,9 +220,10 @@ class mst(netCommand):
 			return("No sensors available.")
 		return(list[:-2])
 
-class dat(netCommand):
+class dat(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "data"
 		self.name = "Data"
 		self.args = "%start\t%end%\t%names | types | group%"
@@ -234,7 +259,7 @@ class dat(netCommand):
 			# and will be removed so checking for names can start at the same point in the array.
 			end = float(args[1])
 			del(args[1])
-		except:
+		except ValueError:
 			pass
 		if (len(args) > 1):
 			if (args[1][0] == "-"):
@@ -272,16 +297,16 @@ class dat(netCommand):
 		if (data is None):
 			return("No data found.")
 		txt = ""
-		template = gs.getTabs("{}") * len(data[0]) + "\n"
+		template = str(gs.getTabs("{}") * len(data[0])) + "\n"
 		txt += template.format(*data[0])
 		for row in data[1:]:
 			txt += template.format(datetime.fromtimestamp(int(row[0])).strftime("%Y-%m-%d %H:%M:%S"), *row[:1])
 		return(txt)
 
-class utm(netCommand):
+class utm(NetCommand):
 
 	def __init__(self):
-
+		super().__init__()
 		self.command = "uptime"
 		self.name = "Uptime"
 		self.args = None
@@ -301,9 +326,10 @@ class utm(netCommand):
 		reply += gs.getTabs("Uptime:", 3) + "{}d, {}:{}:{}".format(*tDiff)
 		return(reply)
 
-class hlp(netCommand):
+class hlp(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "help"
 		self.name = "Help"
 		self.args = "%command%"
@@ -311,7 +337,7 @@ class hlp(netCommand):
 		self.help += "If a valid command is entered as argument a more detailed description\n"
 		self.help += "of how the given command works is returned."
 
-	def runCommand(self, args):
+	def runCommand(self, args = None):
 		commlist = args[0]
 		if (len(args) == 1):
 			commandlist = "Name\t\tCommand\t\tArguments\n"
@@ -327,9 +353,10 @@ class hlp(netCommand):
 			else:
 				return(str(arg) + "\tNo such command exists. Cannot give information.")
 
-class thr(netCommand):
+class thr(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "threads"
 		self.name = "Threads"
 		self.args = None
@@ -339,7 +366,6 @@ class thr(netCommand):
 		"""Gives information about the active threads."""
 
 		tinfo = ("Number of threads active: " + str(threading.activeCount()) + "\n\n")
-		main_thread = threading.main_thread()
 		for t in gs.draadjes:
 			if (t.isAlive()):
 				tinfo += "Thread {} name: ()\n".format(t.threadID, t.getName())
@@ -348,9 +374,10 @@ class thr(netCommand):
 				tinfo += "Thread {} name: {}\n".format(t.threadID, t.getName())
 		return(tinfo)
 
-class wtr(netCommand):
+class wtr(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "water"
 		self.name = "Waterlist"
 		self.args = "%container%, %entries%"
@@ -379,11 +406,11 @@ class wtr(netCommand):
 						if (int(args[1]) >= 1):
 							amount = int(args[1])
 						else:
-							raise Exception
-					except:
+							raise ValueError
+					except ValueError:
 						return("Invalid amount.")
 			# Collect and validate requested data:
-				data1, data2 = gs.db.getWaterEvents(group, water)
+				data1, data2 = gs.db.getWaterEvents(chan, amount)
 				if (data1 is None):
 					return("No plant assigned to container {}.".format(chan))
 			else:
@@ -398,7 +425,7 @@ class wtr(netCommand):
 				for j, row in reversed(data2[i]):
 					if (j > 0):
 						zeit = gs.timediff(int(row[0]) - int(data2[j - 1][0]))
-						results += "\t\tTime since previous watering: {0}d, {1}:{2}:{3}\n".format(*zeit)
+						txt += "\t\tTime since previous watering: {0}d, {1}:{2}:{3}\n".format(*zeit)
 					txt += "\tTime\t\t|Duration\t|Amount\n"
 					txt += "\t{}|{}|{}\n".format(gs.getTabs(datetime.fromtimestamp(int(row[0])).strftime("%Y-%m-%d %H:%M:%S")),
 							 gs.getTabs(round(row[1], 1)), gs.getTabs(row[2]))
@@ -408,9 +435,10 @@ class wtr(netCommand):
 				txt += "\nPlant {} has not been watered yet.\n".format(plant[0])
 		return(txt)
 
-class vts(netCommand):
+class vts(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "vtest"
 		self.name = "Valve test"
 		self.args = "%valve%\t%time%"
@@ -442,7 +470,7 @@ class vts(netCommand):
 				check, v = self.isInt(args[0])
 				if (not check):
 					return("Enter valid valvenumber. (1 - {0})".format(str(len(gs.ch_list))))
-				if (not (v > 0 and v <= len(gs.ch_list))):
+				if (not (0 < v <= gs.control.grouplen())):
 					return("Enter valid valvenumber. (1 - {0})".format(str(len(gs.ch_list))))
 				gs.ch_list[v - 1].valveOn()
 				time.sleep(t)
@@ -451,9 +479,10 @@ class vts(netCommand):
 		else:
 			return("Please turn on Testmode before doing a valvetest.")
 
-class wts(netCommand):
+class wts(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "wtest"
 		self.name = "Water test"
 		self.args = "%container(s)%\t%time%"
@@ -466,7 +495,7 @@ class wts(netCommand):
 
 	def runCommand(self, args = None):
 		if (gs.testmode):
-			if (args == None):
+			if (args is None):
 				g, t = self.defaultParams()
 				gs.pump.demo(g, t)
 				return("Default watering test done.")
@@ -502,9 +531,10 @@ class wts(netCommand):
 			return(valves, t)
 		return(valves, 5)
 		
-class tsm(netCommand):
+class tsm(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "testmode"
 		self.name = "Testmode"
 		self.args = "'on'\t'off'"
@@ -527,9 +557,10 @@ class tsm(netCommand):
 			return("Please specify 'on' or 'off'.")
 		return(gs.testmode)
 
-class spf(netCommand):
+class spf(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "spoof"
 		self.name = "Spoof"
 		self.args = "%settings"
@@ -544,10 +575,10 @@ class spf(netCommand):
 		else:
 			return("Spoofmode disabled.")
 
-class flt(netCommand):
+class flt(NetCommand):
 
 	def __init__(self):
-
+		super().__init__()
 		self.command = "flt"
 		self.name = "Float switch"
 		self.args = ""
@@ -557,9 +588,10 @@ class flt(netCommand):
 
 		return("fltdev pinstate: " + str(gs.fltdev.getStatus()) + " low_water state: " + str(gs.fltdev.low_water))
 
-class pst(netCommand):
+class pst(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "pinstats"
 		self.name = "Pin stats"
 		self.args = "%pin"
@@ -576,7 +608,7 @@ class pst(netCommand):
 				check, dev = self.isInt(args[0][0])
 				if (not check):
 					return("Wrong device number. (0 - {0})".format(str(len(gs.mcplist) - 1)))
-				if (not (dev >= 0 and dev < len(gs.mcplist))):
+				if (not (0 <= dev < len(gs.mcplist))):
 					return("Device does not exist. (0 - {0})".format(str(len(gs.mcplist) - 1)))
 				
 				# Checking bank letter
@@ -587,7 +619,7 @@ class pst(netCommand):
 				check, nr = self.isInt(args[0][2])
 				if (not check):
 					return("Not a pin number. (0 - 7)")
-				if (not (nr >= 0 and nr <= 7)):
+				if (not (0 <= nr <= 7)):
 					return("Pin number out of range. (0 - 7)")
 				
 				# If all checks clear, return requested data.
@@ -598,7 +630,7 @@ class pst(netCommand):
 		else:
 			return("Enter pin number.")
 		
-class set(netCommand):
+class set(NetCommand):
 
 	"""
 	network: check datatypes and container
@@ -606,9 +638,11 @@ class set(netCommand):
 				check if values are valid
 	group:	(auto) set triggers and enable container if values are good
 	db:		Values are written to db if container enabled
+	lcd:     update bounds for appropriate bar
 	"""
 
 	def __init__(self):
+		super().__init__()
 		self.command = "set"
 		self.name = "Set"
 		self.args = "%channel\t%trigger\t%value"
@@ -631,7 +665,7 @@ class set(netCommand):
 		value = 0
 		lowval = 0
 		if (args is not None):
-			if (len(args) > 0):
+			if (len(args) > 1):
 				if (args[0] == "auto"):
 					msg = ""
 					for i in range(gs.control.grouplen()):
@@ -644,13 +678,13 @@ class set(netCommand):
 					if (not (args[1] == "low" or args[1] == "high")):
 						try:
 							lowval = int(args[1])
-						except:
+						except ValueError:
 							return("Enter 'low' or 'high' as first argument.")
 					else:
 						trig = args[1]
 					try:
 						value = int(args[2])
-					except:
+					except ValueError:
 						return("Incorrect value for trigger.")
 					if (trig == ""):
 						return(gs.control.setTriggers(chan, lowval, value))
@@ -662,9 +696,10 @@ class set(netCommand):
 					return(gs.control.setTriggers(chan))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 
-class get(netCommand):
+class get(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "get"
 		self.name = "Get"
 		self.args = "%channel"
@@ -686,7 +721,7 @@ class get(netCommand):
 				reply += ("Low\t|Now\t|High\n")
 				lt, ht = gs.control.getTriggers(chan)
 				lvl = gs.control.requestData("soil-g" + chan[-1])
-				reply += "{}\t|{}\t|{}\t|{}\n".format(name, lt, lvl, ht)
+				reply += "{}\t|{}\t|{}\n".format(lt, lvl, ht)
 				return (reply)
 			return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 
@@ -699,9 +734,10 @@ class get(netCommand):
 			reply += "{}\t|{}\t|{}\t|{}\n".format(name, lt, lvl, ht)
 		return(reply)
 
-class gra(netCommand):
+class gra(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "graph"
 		self.name = "Graph"
 		self.args = "%start\t%end%\t%type%"
@@ -741,20 +777,17 @@ class gra(netCommand):
 				return("Enter numeric start time.")
 			elif (not (start > 0.0)):
 				return("Enter valid start time.")
-			# Checking for valid end time and sensor names.
+			# Checking for valid end time.
 			if (len(args) > 1):
-				check, en = self.isFloat(args[1])
-				if (check):
-					if (en < start):
-						end = en
+				if (isinstance(args[1], float)):
+					if (args[1] < start):
+						end = args[1]
 					else:
 						return("Enter valid end time.")
-					if (len(args) > 2):
-						names = self.checkNames(args[2:])
-				# No endtime, checking for sensor names.
-				else:
-					names = self.checkNames(args[1:])
-				if (names == None):
+					del(args[1])
+				# Checking for sensor names.
+				names = self.checkNames(args[1:])
+				if (names is None):
 					# Names where entered, but none where valid so no graph can be made.
 					return("No valid name entered. Check 'help graph' for valid names.")
 				elif (len(names) == 0):
@@ -763,7 +796,7 @@ class gra(netCommand):
 				msg = gs.webgraph.makeGraph(start, end, names)
 			else:
 				msg = gs.webgraph.makeGraph(start)
-			if (msg == None):
+			if (msg is None):
 				msg = "Done."
 			return(msg)
 		else:
@@ -789,9 +822,10 @@ class gra(netCommand):
 			return(None)
 		return(names)
 
-class log(netCommand):
+class log(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "log"
 		self.name = "Log"
 		self.args = "%entries%\t%level%"
@@ -855,14 +889,14 @@ class log(netCommand):
 
 		return(msg)
 
-class adp(netCommand):
+class adp(NetCommand):
 	"""
 	The name and type of the plant are seperated by a comma to enable users to
 	enter multi-word plant names and species.
 	"""
 
 	def __init__(self):
-
+		super().__init__()
 		self.command = "addplant"
 		self.name = "Add plant"
 		self.args = "%container\t%plantName\t%plantType%"
@@ -895,10 +929,11 @@ class adp(netCommand):
 				return(gs.control.addPlant(chan, name, type))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 
-class rmp(netCommand):
+class rmp(NetCommand):
 	"""Disassociate plant from container by plantname or container number."""
 
 	def __init__(self):
+		super().__init__()
 		self.command = "remplant"
 		self.name = "Remove plant"
 		self.args = "%plantName or %groupnr"
@@ -915,9 +950,10 @@ class rmp(netCommand):
 			return("Failed to remove plant from container {}. Check log for details.".format(chan))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 
-class cth(netCommand):
+class cth(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "cthist"
 		self.name = "Container history"
 		self.args = "%groupnr"
@@ -933,15 +969,16 @@ class cth(netCommand):
 			return(gs.db.getContainerHistory(chan))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 	
-class sen(netCommand):
+class sen(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "sensors"
 		self.name = "Sensor list"
 		self.args = None
 		self.help = "Returns a list with all sensors and some metadata per sensor.\n"
 
-	def runCommand(self, args):
+	def runCommand(self, args = None):
 
 		slist = gs.control.getDBcheckData()
 		msg = ""
@@ -953,9 +990,10 @@ class sen(netCommand):
 				msg += gs.getTabs("|" + item)
 		return(msg)
 
-class led(netCommand):
+class led(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "powerled"
 		self.name = "Toggle powerled"
 		self.args = "%LED channel%"
@@ -966,8 +1004,9 @@ class led(netCommand):
 
 	def runCommand(self, args = None):
 		if (args is not None):
+			chan = args[0]
 			try:
-				if (not (0 < int(args[0]) <= len(gs.powerLEDpins))):
+				if (not (0 < int(chan) <= len(gs.powerLEDpins))):
 					raise ValueError
 			except ValueError:
 				return("Please enter valid channel.")
@@ -977,9 +1016,10 @@ class led(netCommand):
 				return("Failed to toggle powerLED on channel {}. State: {}".format(chan, gs.control.powerLEDstate(chan)[0]))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 				
-class stl(netCommand):
+class stl(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "setled"
 		self.name = "setled"
 		self.args = "%LED channel, %value"
@@ -1000,13 +1040,14 @@ class stl(netCommand):
 				except ValueError:
 					return("Please enter valid channel.")
 				if (args[1] in ["1ww", "3ww", "3ir"]):
-					gs.control.powerLEDset(chan, args[1])
-					return("Channel {} set to: '{}'. Now ready to be used.".format(chan, args[1]))
+					gs.control.powerLEDset(args[0], args[1])
+					return("Channel {} set to: '{}'. Now ready to be used.".format(args[0], args[1]))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 	
-class pwr(netCommand):
+class pwr(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "power"
 		self.name = "power readings"
 		self.args = "%power rail%, %type%"
@@ -1043,9 +1084,10 @@ class pwr(netCommand):
 			msg += "\n"
 		return(msg)
 	
-class lbm(netCommand):
+class lbm(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "barmode"
 		self.name = "LEDbar mode"
 		self.args = "%mode%"
@@ -1064,18 +1106,19 @@ class lbm(netCommand):
 			if (isinstance(item, str)):
 				msg += item + ":\n"
 			else:
-				for item in ["|Name", "|Displayed", "|Low", "|High"]:
-					msg += gs.getTabs(item)
+				for name in ["|Name", "|Displayed", "|Low", "|High"]:
+					msg += gs.getTabs(name)
 				msg += "\n"
-				for row in slist:
-					for item in row:
-						msg += gs.getTabs("|" + item)
+				for row in item:
+					for val in row:
+						msg += gs.getTabs("|" + val)
 					msg += "\n"
 		return(msg)
 
-class lcd(netCommand):
+class lcd(NetCommand):
 
 	def __init__(self):
+		super().__init__()
 		self.command = "lcd"
 		self.name = "LCD settings"
 		self.args = "%setting\t%arguments%"

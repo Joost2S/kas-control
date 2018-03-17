@@ -1,13 +1,13 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.10.01	10-03-2018
+# v0.10.03	16-03-2018
 
 from collections import OrderedDict
 import csv
 from datetime import datetime, timedelta
 import logging
-import Queue
+import queue
 import RPi.GPIO as GPIO
 import threading
 import time
@@ -80,7 +80,7 @@ class hwControl(object):
 			self.__fan = globstuff.fan(gs.fanPin)
 		if (gs.hwOptions["ledbars"]):
 			self.__tempbar = ["ambientt", "out_shade"]
-		self.__powerQueue = Queue.PriorityQueue()
+		self.__powerQueue = queue.PriorityQueue()
 		self.__setTemplate()
 		self.setTimeRes()
 		gs.control = self
@@ -242,7 +242,7 @@ class hwControl(object):
 		if (i == 0):
 			self.__pump.off()
 			time.sleep(0.1)
-		self.valves[chan].off()
+		self.valves[group].off()
 			
 	def __chekPumpAvail(self, *cur):
 		"""Use this to check if the pump is available for use."""
@@ -437,7 +437,7 @@ class hwControl(object):
 							mname = "soil-g" + i
 							tname = None
 							fname = None
-							mst = self.__setSoilSensor(mstname, output[3], output[2], output[1])
+							mst = self.__setSoilSensor(mname, output[3], output[2], output[1])
 							if (gs.hwOptions["soiltemp"] and tdev is not None):
 								tname = "temp-g" + i
 								self.__sensors[tname] = "temp"
@@ -473,9 +473,9 @@ class hwControl(object):
 	def __setLEDbars(self):
 		"""Sets the values and bounds for the LEDbars to display."""
 		
-		self.__LEDbars["temps"] = LEDbar(gs.leds1, 1)
+		self.__LEDbars["temps"] = ledbar.LEDbar(gs.leds1, 1)
 		self.__LEDbars["temps"].setNames([["board", 18, 27], ["ambientt", 18, 27]])
-		self.__LEDbars["mst"] = LEDbar(gs.leds2, 3)
+		self.__LEDbars["mst"] = ledbar.LEDbar(gs.leds2, 3)
 		barnames = []
 		for i in range(6):
 			barnames.append(["soil_g" + str(i+1), 10, 60])
@@ -632,7 +632,7 @@ class hwControl(object):
 	def __perc(self, value, decimals = 1):
 		"""Returns the value as percentage of the ADC resolution."""
 
-		return(round((data * 100) / float(self.__adc.getResolution()), decimals))
+		return(round((value * 100) / float(self.__adc.getResolution()), decimals))
 
 	def __checkConnected(self):
 		"""Checks and sets wether a sensor is connected to each channel of the ADC."""
@@ -701,7 +701,7 @@ class hwControl(object):
 		"""
 		
 		tempsensors = len(self.__tempMGR.getTdevList())
-		if (time == None):
+		if (time is None):
 			if (tempsensors < 5):
 				self.__timeRes = 5
 			else:
@@ -721,12 +721,12 @@ class hwControl(object):
 
 		data = {}
 		for n, g in self.__groups.items():
+			# SQLite3 doesn't support dashes (-) in column names, so replace with underscore (_).
 			names = [g.mstName.replace("-", "_")]
 			if (gs.hwOptions["soiltemp"] and g.tempName is not None):
 				names.append(g.tempName.replace("-", "_"))
 			if (gs.hwOptions["flowsensors"] and g.flowName is not None):
 				names.append(g.flowName.replace("-", "_"))
-			# SQLite3 doesn't support dashes (-) in column names, so replace with underscore (_).
 			data[n] = names
 		return(data)
 	
@@ -793,7 +793,10 @@ class hwControl(object):
 		"""Reset and turn off all in- and outputs when shutting down the system."""
 		
 		if (gs.hwOptions["lcd"]):
-			self.LCD.enable_display(False)
+			self.LCD.disable()
+		if (gs.hwOptions["ledbars"]):
+			for bar in self.__LEDbars.values():
+				bar.setMode("off")
 		self.__statusLED.off()
 		self.__pump.disable()
 		# Turn off valve in each Group.
