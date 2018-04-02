@@ -42,6 +42,13 @@ class Group(object):
 		self.tempName = tname
 		self.__lock = threading.Lock()
 		self.plantName = None
+		self.modes = ["enabled",
+		              "not connected",
+		              "watering requested",
+		              "watering",
+		              "done watering",
+		              "disabled",
+		              "planted"]
 	
 
 	def getSensorData(self):

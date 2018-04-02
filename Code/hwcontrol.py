@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.10.03	16-03-2018
+# v0.10.04	29-03-2018
 
 from collections import OrderedDict
 import csv
@@ -77,7 +77,7 @@ class hwControl(object):
 		if (gs.hwOptions["powermonitor"]):
 			self.__plcontroller = powerLEDs.PowerLEDcontroller()
 		if (gs.hwOptions["fan"]):
-			self.__fan = globstuff.fan(gs.fanPin)
+			self.__fan = globstuff.Fan(gs.fanPin)
 		if (gs.hwOptions["ledbars"]):
 			self.__tempbar = ["ambientt", "out_shade"]
 		self.__powerQueue = queue.PriorityQueue()
@@ -266,7 +266,7 @@ class hwControl(object):
 		if (gs.hwOptions["powermonitor"]):
 			current = self.__ina["12v"].getCurrent()		# get current power draw from the PSU.
 		else:
-			pass
+			current = 0
 		if (isinstance(cur[0], int)):
 			for c in cur:
 				current += c
@@ -401,7 +401,7 @@ class hwControl(object):
 							if (curType == "ledbar"):
 								if (gs.hwOptions["ledbars"]):
 									try:
-										self.__LEDbars[output[0]] = ledbar.LEDbar(output[2:], output[1])
+										self.__setLEDbars(output[0], output[1], output[2:])
 									except Exception as msg:
 										logging.error(msg)
 										raise Exception
@@ -437,7 +437,7 @@ class hwControl(object):
 							mname = "soil-g" + i
 							tname = None
 							fname = None
-							mst = self.__setSoilSensor(mname, output[3], output[2], output[1])
+							self.__setSoilSensor(mname, output[3], output[2], output[1])
 							if (gs.hwOptions["soiltemp"] and tdev is not None):
 								tname = "temp-g" + i
 								self.__sensors[tname] = "temp"
@@ -470,21 +470,19 @@ class hwControl(object):
 		self.__sensors[output[0] + "c"] = "pwr"
 		self.__otherSensors[output[0] + "c"] = "pwr"
 		
-	def __setLEDbars(self):
+	def __setLEDbars(self, name, icount, pins):
 		"""Sets the values and bounds for the LEDbars to display."""
 		
-		self.__LEDbars["temps"] = ledbar.LEDbar(gs.leds1, 1)
-		self.__LEDbars["temps"].setNames([["board", 18, 27], ["ambientt", 18, 27]])
-		self.__LEDbars["mst"] = ledbar.LEDbar(gs.leds2, 3)
-		barnames = []
-		for i in range(6):
-			barnames.append(["soil_g" + str(i+1), 10, 60])
-		self.__LEDbars["mst"].setNames(barnames)
+		self.__LEDbars[name] = ledbar.LEDbar(pins, icount)
+		if (name == "temps"):
+			self.__LEDbars[name].setNames([["board", 18, 27], ["ambientt", 18, 27]])
+		else:
+			self.__LEDbars[name].setNames(gs.defaultLCDsensors)
 
 	def __setTemplate(self):
 		"""Generates the template for the formatted currentstats."""
 
-		lines = []
+		lines = list()
 		lines.append("{time}")
 		lines.append("Plant\t")
 		lines.append("Mst\t")
@@ -559,7 +557,7 @@ class hwControl(object):
 		
 		#	Indicate to user that the system is up and running.
 		if (gs.hwOptions["lcd"]):
-			self.LCD.set_backlight(1)
+			self.LCD.toggleBacklight()
 			msg  = "   Welcome to   \n"
 			msg += "   Kas-Control  "
 			if (gs.LCD_SIZE[1] == 4):
@@ -568,12 +566,10 @@ class hwControl(object):
 			self.LCD.setNames(gs.defaultLCDsensors)
 		else:
 			self.__statusLED.blinkSlow(3)
-		if (gs.hwOptions["ledbars"]):
-			self.__setLEDbars()
 
 		try:
 			while (gs.running):
-				data = {}
+				data = dict()
 
 				# Start collecting data.
 				data["time"] = time.strftime("%H:%M:%S")

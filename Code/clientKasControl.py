@@ -1,5 +1,5 @@
 ﻿#!/usr/bin/python3
- 
+
 # Author: J. Saarloos
 # v1.0	16-08-2017
 
@@ -20,7 +20,7 @@ class shutdownError(Exception):
 	pass
 
 class kasControlClient(object):
-	
+
 	host = "kas-control"
 	ipList = [("", "Login remote."),
 				("", "Login from remote location."),
@@ -59,7 +59,7 @@ class kasControlClient(object):
 		print("Socket secured")
 
 		try:
-			self.ipAddr[0] = socket.gethostbyname(self.host)
+			self.ipAddr = socket.gethostbyname(self.host)
 		except socket.gaierror:
 			# could not resolve
 			print("Hostname could not be resolved.")
@@ -117,7 +117,7 @@ class kasControlClient(object):
 			raise KeyboardInterrupt
 
 	def getData(self):
-		
+
 		data = ""
 		try:
 			i = int(self.sslSocket.recv(256).decode())
@@ -138,21 +138,21 @@ class kasControlClient(object):
 				print("writing to file")
 				text_file.write(bytes(data[:-6], "utf-8"))
 		except FileNotFoundError:
-			logging.debug("File not found: " + self.htmlFile)
+#			logging.debug("File not found: " + self.htmlFile)
 			return("File not found. Unable to make graph.")
 		except IOError:
-			logging.debug("IO error trying to write to file: " + self.htmlFile)
+#			logging.debug("IO error trying to write to file: " + self.htmlFile)
 			return("IO error. Unable to make graph.")
 		except:
 			return("Unknown error writing to file.")
-		
+
 #		open browser to display file.
 		url = "file://" + self.htmlFile
 		webbrowser.open(url, new = 2)
 		return("Done.")
 
 	def shutdown(self):
-		
+
 		print("Closing socket...")
 		self.sslSocket.close()
 		sys.exit()

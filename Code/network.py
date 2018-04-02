@@ -1,7 +1,7 @@
 #!/usr/bin/python3
- 
+
 # Author: J. Saarloos
-# v1.1.08	16-03-2018
+# v1.1.09	01-04-2018
 
 """
 Template for making a new net command:
@@ -9,13 +9,14 @@ Template for making a new net command:
 class cmd(netCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(cmd, self).__init__()
 		self.command = "command"
 		self.name = "Command"
 		self.args = ""
+		self.guiArgs = {}
 		self.help = ""
 		self.help += ""
-		
+
 	def runCommand(self, args = None):
 		if (args is not None):
 			pass
@@ -60,6 +61,13 @@ class NetCommand(object):
 	@args.setter
 	def args(self, args):
 		self.__args = args
+	# guiArgs
+	@property
+	def guiArgs(self):
+		return(self.__guiArgs)
+	@guiArgs.setter
+	def guiArgs(self, guiArgs):
+		self.__guiArgs = guiArgs
 	# helpLong
 	@property
 	def help(self):
@@ -67,17 +75,17 @@ class NetCommand(object):
 	@help.setter
 	def help(self, help):
 		self.__help = help
-	
+
 	@abstractmethod
 	def __init__(self):
-		super().__init__()
-	
+		super(NetCommand, self).__init__()
+
 	@abstractmethod
 	def runCommand(self, args = None):
 		pass
-	
+
 	def channelCheck(self, container):
-		
+
 		try:
 			if (not (0 < int(container) <= gs.control.grouplen())):
 				raise Exception
@@ -98,17 +106,20 @@ class NetCommand(object):
 		except (TypeError, ValueError):
 			return(False, "Wrong input. Float expected. " + str(flt))
 		return(True, f)
-	
+
 	def returnHelp(self):
 		return(self.help)
 
 class ext(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(ext, self).__init__()
 		self.command = "exit"
 		self.name = "Exit"
 		self.args = "'-s'\t'-r'\t'-x'"
+		self.guiArgs = {"-s" : "Stopping Kas Control software.",
+							"-r" : "Rebooting rPi.",
+							"-x" : "Shutting down rPi."}
 		self.help = "Arguments:\n\n"
 		self.help += "None\tExit the client.\n"
 		self.help += "-s\tStop the software.\n"
@@ -140,7 +151,7 @@ class ext(NetCommand):
 class cur(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(cur, self).__init__()
 		self.command = "cur"
 		self.name = "Current stats"
 		self.args = None
@@ -152,7 +163,7 @@ class cur(NetCommand):
 class tem(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(tem, self).__init__()
 		self.command = "temp"
 		self.name = "Temperature"
 		self.args = "%name%"
@@ -181,10 +192,12 @@ class tem(NetCommand):
 class mst(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(mst, self).__init__()
 		self.command = "mst"
 		self.name = "Moisture level"
 		self.args = "%group"
+		self.guiArgs = {None : "Returns levels of all containers.",
+			"group" : [1, gs.control.grouplen()]}
 		self.help = []
 		self.help.append("Takes a measurement of the given sensor and returns the soilmoisture level.\n")
 		self.help.append("Available sensors:\n")
@@ -200,7 +213,7 @@ class mst(NetCommand):
 		return(h)
 
 	def runCommand(self, args = None):
-		
+
 		if (args is not None):
 			if (len(args) > 0):
 				check, chan = self.channelCheck(args[0])
@@ -223,7 +236,7 @@ class mst(NetCommand):
 class dat(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(dat, self).__init__()
 		self.command = "data"
 		self.name = "Data"
 		self.args = "%start\t%end%\t%names | types | group%"
@@ -306,7 +319,7 @@ class dat(NetCommand):
 class utm(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(utm, self).__init__()
 		self.command = "uptime"
 		self.name = "Uptime"
 		self.args = None
@@ -315,7 +328,7 @@ class utm(NetCommand):
 
 	def runCommand(self, args = None):
 		return(self.uptime())
-	
+
 	def uptime(self):
 		"""Returns the boottime and current uptime."""
 
@@ -329,7 +342,7 @@ class utm(NetCommand):
 class hlp(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(hlp, self).__init__()
 		self.command = "help"
 		self.name = "Help"
 		self.args = "%command%"
@@ -356,12 +369,12 @@ class hlp(NetCommand):
 class thr(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(thr, self).__init__()
 		self.command = "threads"
 		self.name = "Threads"
 		self.args = None
 		self.help = "Returns a list of the currently running threads of this software."
-		
+
 	def runCommand(self, args = None):
 		"""Gives information about the active threads."""
 
@@ -377,7 +390,7 @@ class thr(NetCommand):
 class wtr(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(wtr, self).__init__()
 		self.command = "water"
 		self.name = "Waterlist"
 		self.args = "%container%, %entries%"
@@ -394,7 +407,7 @@ class wtr(NetCommand):
 		data2 = None
 		txt = ""
 		amount = None
-		
+
 		# Extract and validate user input:
 		if (args is not None):
 			if (len(args) > 0):
@@ -438,7 +451,7 @@ class wtr(NetCommand):
 class vts(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(vts, self).__init__()
 		self.command = "vtest"
 		self.name = "Valve test"
 		self.args = "%valve%\t%time%"
@@ -482,7 +495,7 @@ class vts(NetCommand):
 class wts(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(wts, self).__init__()
 		self.command = "wtest"
 		self.name = "Water test"
 		self.args = "%container(s)%\t%time%"
@@ -530,11 +543,11 @@ class wts(NetCommand):
 		if (t is not None):
 			return(valves, t)
 		return(valves, 5)
-		
+
 class tsm(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(tsm, self).__init__()
 		self.command = "testmode"
 		self.name = "Testmode"
 		self.args = "'on'\t'off'"
@@ -560,7 +573,7 @@ class tsm(NetCommand):
 class spf(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(spf, self).__init__()
 		self.command = "spoof"
 		self.name = "Spoof"
 		self.args = "%settings"
@@ -569,7 +582,7 @@ class spf(NetCommand):
 		self.help += "Isn't working yet."
 
 	def runCommand(self, args = None):
-		
+
 		if (gs.control.toggleSpoof()):
 			return("Spoofmode enabled.")
 		else:
@@ -578,7 +591,7 @@ class spf(NetCommand):
 class flt(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(flt, self).__init__()
 		self.command = "flt"
 		self.name = "Float switch"
 		self.args = ""
@@ -591,7 +604,7 @@ class flt(NetCommand):
 class pst(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(pst, self).__init__()
 		self.command = "pinstats"
 		self.name = "Pin stats"
 		self.args = "%pin"
@@ -600,7 +613,7 @@ class pst(NetCommand):
 		self.help += "Example: pinstats 1b5"
 
 	def runCommand(self, args = None):
-		
+
 		if (args is not None):
 			if (len(args[0]) == 3):
 
@@ -610,18 +623,18 @@ class pst(NetCommand):
 					return("Wrong device number. (0 - {0})".format(str(len(gs.mcplist) - 1)))
 				if (not (0 <= dev < len(gs.mcplist))):
 					return("Device does not exist. (0 - {0})".format(str(len(gs.mcplist) - 1)))
-				
+
 				# Checking bank letter
 				if (not (args[0][1] == "a" or args[0][1] == "b")):
 					return("Bank does not exist. (a or b)")
-				
+
 				# Checking pin number
 				check, nr = self.isInt(args[0][2])
 				if (not check):
 					return("Not a pin number. (0 - 7)")
 				if (not (0 <= nr <= 7)):
 					return("Pin number out of range. (0 - 7)")
-				
+
 				# If all checks clear, return requested data.
 				blah = "Device addr: {}\n".format(hex(gs.getPinDev(args[0]).devAddr))
 				return(blah + gs.getPinDev(args[0]).getPinStats(gs.getPinNr(args[0])))
@@ -629,7 +642,7 @@ class pst(NetCommand):
 				return("0Incorrect format: " + str(args[0]))
 		else:
 			return("Enter pin number.")
-		
+
 class set(NetCommand):
 
 	"""
@@ -642,7 +655,7 @@ class set(NetCommand):
 	"""
 
 	def __init__(self):
-		super().__init__()
+		super(set, self).__init__()
 		self.command = "set"
 		self.name = "Set"
 		self.args = "%channel\t%trigger\t%value"
@@ -699,7 +712,7 @@ class set(NetCommand):
 class get(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(get, self).__init__()
 		self.command = "get"
 		self.name = "Get"
 		self.args = "%channel"
@@ -737,7 +750,7 @@ class get(NetCommand):
 class gra(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(gra, self).__init__()
 		self.command = "graph"
 		self.name = "Graph"
 		self.args = "%start\t%end%\t%type%"
@@ -825,7 +838,7 @@ class gra(NetCommand):
 class log(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(log, self).__init__()
 		self.command = "log"
 		self.name = "Log"
 		self.args = "%entries%\t%level%"
@@ -838,12 +851,12 @@ class log(NetCommand):
 
 
 	def runCommand(self, args = None):
-		
+
 		a = ""
 		lines = 100
 		output = []
 		msg = ""
-		
+
 		# Getting settings from arguments
 		if (args is not None):
 			check, i = self.isInt(args[0])
@@ -896,7 +909,7 @@ class adp(NetCommand):
 	"""
 
 	def __init__(self):
-		super().__init__()
+		super(adp, self).__init__()
 		self.command = "addplant"
 		self.name = "Add plant"
 		self.args = "%container\t%plantName\t%plantType%"
@@ -909,7 +922,7 @@ class adp(NetCommand):
 		self.help += "Plant name and type can contain spaces, are seperated by a comma (,).\n"
 
 	def runCommand(self, args = None):
-		
+
 		name = None
 		type = None
 		if (args is not None):
@@ -933,7 +946,7 @@ class rmp(NetCommand):
 	"""Disassociate plant from container by plantname or container number."""
 
 	def __init__(self):
-		super().__init__()
+		super(rmp, self).__init__()
 		self.command = "remplant"
 		self.name = "Remove plant"
 		self.args = "%plantName or %groupnr"
@@ -953,7 +966,7 @@ class rmp(NetCommand):
 class cth(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(cth, self).__init__()
 		self.command = "cthist"
 		self.name = "Container history"
 		self.args = "%groupnr"
@@ -968,11 +981,11 @@ class cth(NetCommand):
 			# Maybe do some formatting.
 			return(gs.db.getContainerHistory(chan))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
-	
+
 class sen(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(sen, self).__init__()
 		self.command = "sensors"
 		self.name = "Sensor list"
 		self.args = None
@@ -993,7 +1006,7 @@ class sen(NetCommand):
 class led(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(led, self).__init__()
 		self.command = "powerled"
 		self.name = "Toggle powerled"
 		self.args = "%LED channel%"
@@ -1015,11 +1028,11 @@ class led(NetCommand):
 			else:
 				return("Failed to toggle powerLED on channel {}. State: {}".format(chan, gs.control.powerLEDstate(chan)[0]))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
-				
+
 class stl(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(stl, self).__init__()
 		self.command = "setled"
 		self.name = "setled"
 		self.args = "%LED channel, %value"
@@ -1043,11 +1056,11 @@ class stl(NetCommand):
 					gs.control.powerLEDset(args[0], args[1])
 					return("Channel {} set to: '{}'. Now ready to be used.".format(args[0], args[1]))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
-	
+
 class pwr(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(pwr, self).__init__()
 		self.command = "power"
 		self.name = "power readings"
 		self.args = "%power rail%, %type%"
@@ -1083,21 +1096,25 @@ class pwr(NetCommand):
 				msg += "|{}".format(gs.getTabs(gs.control.requestData(r + o)))
 			msg += "\n"
 		return(msg)
-	
+
 class lbm(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(lbm, self).__init__()
 		self.command = "barmode"
 		self.name = "LEDbar mode"
 		self.args = "%mode%"
+		self.guiArgs = {None: "Returns the current configuration.",
+							"mode" : {"bar" : "LEDs 1 - current light up.",
+							          "dot": "Only the current LED lights up.",
+							          "off" : "Turns the LEDbar off"}}
 		self.help = "Change LEDbar mode to 'bar', 'dot' or 'off'.\n"
 		self.help += "If no argument is given, the current configuration is returned."
-	
+
 	def runCommand(self, args = None):
 
 		if (args is not None):
-			if (args[0] in ["bar", "dot", "off"]):
+			if (args[0] in self.guiArgs["mode"].keys()):
 				gs.control.setLEDbarMode(args[0])
 				return("LEDbars set to: {}".format(args[0]))
 			return("Not a valid mode for LEDbars.")
@@ -1118,7 +1135,7 @@ class lbm(NetCommand):
 class lcd(NetCommand):
 
 	def __init__(self):
-		super().__init__()
+		super(lcd, self).__init__()
 		self.command = "lcd"
 		self.name = "LCD settings"
 		self.args = "%setting\t%arguments%"
@@ -1164,10 +1181,10 @@ class lcd(NetCommand):
 						gs.control.LCD.message(msg[:-1], t)
 						return("Message set.")
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
-				
+
 
 class Server(object):
-	
+
 	# commands
 	@property
 	def commands(self):
@@ -1224,7 +1241,7 @@ class Server(object):
 			logging.critical("Failed to create socket. Error code: " + str(msg[0]) + " , Error message : " + msg[1])
 			raise shutdownError("Socket creation failed.")
 		print("Socket created")
-		
+
 		self.sslSock = ssl.wrap_socket(s,
 												server_side = True,
 												ssl_version = ssl.PROTOCOL_TLSv1_2,
@@ -1244,18 +1261,18 @@ class Server(object):
 				logging.warning("Failed bind. " + str(msg))
 			gs.port += 1
 		print("Socket bind complete")
-		
+
 		self.sslSock.listen(10)
 		print("Socket now listening")
-	
+
 	def serverLoop(self):
 		"""Main loop, waiting to accept new connections."""
-		
+
 		try:
 			while (gs.running):
 				# Wait to accept a connection - blocking call.
 				conn, addr = self.sslSock.accept()
-								
+
 				if (addr[0] != "127.0.0.1"):
 					try:
 						nt = client(gs.getThreadNr(), "client-" + str(self.clientNr), args = (conn, addr[0], str(addr[1])))
@@ -1271,7 +1288,7 @@ class Server(object):
 
 	def clientthread(self, conn, ip, port):
 		"""Function for handling connections. This will be used by the network thread."""
-		
+
 		logging.info("Connected with " + ip + ":" + port)
 		# Sending welcome message to connected client
 		try:
@@ -1294,7 +1311,7 @@ class Server(object):
 			except:
 				logging.error("Some error occured while executing net command {}".format(str(data[0])))
 				msg = ["Unknown error occured while executing command.\nEOF"]
-			
+
 			# Sending reply back to client
 			conn.sendall(bytes(str(i), "utf-8"))
 			for j in range(i + 1):
@@ -1350,7 +1367,7 @@ class Server(object):
 			return(i, text)
 		else:
 			return(0, ["Not a valid command. " + command])
-	
+
 
 class client(globstuff.protoThread):
 	def run(self):

@@ -481,7 +481,7 @@ class mcp23008(mcp230xx):
 		if (not self.enabled):
 			print("Init MCP23017 (" + hex(self.devAddr) + ")...")
 			# Set device's registers and get value for last register.
-			value = self.__setRegisters(self.GPA)
+			value = self.setRegisters(self.GPA)
 			
 			self.bus.write_byte_data(self.devAddr, self.regMap["IOCON"], value)
 			

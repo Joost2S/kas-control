@@ -332,7 +332,7 @@ class Pump(object):
 			self.startTime = None
 			
 
-class fan(object):
+class Fan(object):
 
 	__mcp = None
 	__pin = ""
@@ -341,7 +341,7 @@ class fan(object):
 
 	def __init(self, pin):
 		
-		if (globstuff.getPinDev(pin).setPin(globstuff.getPinNr(pin))):
+		if (globstuff.getPinDev(pin).setPin(globstuff.getPinNr(pin), False)):
 			self.__mcp = globstuff.getPinDev(pin)
 			self.__pin = globstuff.getPinNr(pin)
 
@@ -421,7 +421,7 @@ class globstuff:
 
 	# Initiate MCP23017 GPIO expanders:
 	mcplist = [mcp23017.mcp23017(0x21),				# u2
-				mcp23017.mcp23017(0x20, intPintU4),	# u4
+				mcp23017.mcp23017(0x20, intPinU4),	# u4
 				mcp23017.mcp23017(0x23, intPinU5),	# u5
 				mcp23017.mcp23017(0x27)					# u6
 				]

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
- 
+
 # Author: J. Saarloos
-# v0.6.01	10-03-2018
+# v0.6.02	01-04-2018
 
 import logging
 
@@ -13,7 +13,7 @@ class LEDbar(object):
 	Option to set some of the LEDs as indicators using binary notation.
 	Can be used if user wants to display more than one value on 1 bar.
 	"""
-	
+
 	# iPins			List with indicator pin numbers
 	@property
 	def iPins(self):
@@ -78,8 +78,8 @@ class LEDbar(object):
 	def bounds(self, bounds):
 		self.__bounds = bounds
 
-	def __init__(self, pins = [], icount = 0, fromLorR = "r", mode = "bar"):
-		
+	def __init__(self, pins = (), icount = 0, fromLorR = "r", mode = "bar"):
+
 		if (len(pins) < 1):
 			raise Exception("No pins are defined for the LEDbar.")
 		if (not (len(pins) > icount)):
@@ -122,9 +122,9 @@ class LEDbar(object):
 		for pin in pins:
 			gs.getPinDev(pin).setPin(gs.getPinNr(pin), False)
 
-		
+
 	def setNames(self, names):
-		
+
 		# names = [[name, lower, upper], [name, lower, upper],..]
 		if (len(names) > 0):
 			if (len(names) > (2 ** len(self.iPins))):
@@ -138,7 +138,7 @@ class LEDbar(object):
 
 	def updateBounds(self, name, low, high):
 		"""Set bound levels based on the channel's trigger values."""
-		
+
 		try:
 			i = self.names.index(name)
 			self.bounds[i] = [0.85 * low, 1.15 * high]
@@ -154,7 +154,7 @@ class LEDbar(object):
 		return(data)
 
 	def updateBar(self, a = 0):
-		
+
 		if (self.mode == "off"):
 			return
 		if (a >= len(self.names)):
@@ -178,8 +178,8 @@ class LEDbar(object):
 		self.displayed[i] = True
 		values = gs.control.requestData(caller = "display")
 		# Skip to next value if current value is disabled or sensor data is not available.
-		if (self.bounds[i][0] == None or isinstance(values[self.names[i]], str)):
-			self.updateBar(values, a + 1)
+		if (self.bounds[i][0] is None or isinstance(values[self.names[i]], str)):
+			self.updateBar(a + 1)
 		# Check how many LEDs should be on with new value:
 		if (values[self.names[i]] < self.bounds[i][0]):
 			newLEDs = 0
@@ -246,7 +246,7 @@ class LEDbar(object):
 			changePins[pin[0]].append(gs.getPinNr(pin))
 		for dev, pinlist in changePins.items():
 			gs.getPinDev(dev).output(pinlist, state)
-	
+
 	def setMode(self, mode):
 		"""Change between bar mode and dot mode."""
 
