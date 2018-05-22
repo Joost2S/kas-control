@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
- 
+
 # Author: J. Saarloos
-# v1.4.02	04-03-2018
+# v1.04.02	04-03-2018
 
 """
 For controlling MCP3208 and MCP3008 adc for light and moisture readings.
@@ -53,14 +53,14 @@ class MCP3x0x(object):
 
 
 	def __init__(self, spi, gpio = None):
-		
+
 		# Setup for the adc connected with spi
 		self.spi = spidev.SpiDev()
 		self.spi.open(0, spi)
 		self.spi.max_speed_hz = 2000000
 		self.gpio = gpio
 		self.__tlock = threading.Lock()
-		
+
 
 	@abstractmethod
 	def readChannel(self, name):
@@ -74,7 +74,7 @@ class MCP3x0x(object):
 
 	def setChannel(self, name, chan, p1 = None, p2 = None, gpio = None):
 		"""Define flip-flop pins for each channel. Optional to define an alternate gpio for the channel."""
-		
+
 		if (not (0 >= chan > self.chanAmount)):
 			logging.debug("Incorrect channel: " + str(chan))
 			return
@@ -93,7 +93,7 @@ class MCP3x0x(object):
 			self.channels[name] = channel(chan, mcp, p1, p2)
 		else:
 			logging.debug("Only one flip flop pin given, please give 2 pins for a complete flip-flop circuit.")
-		
+
 	def getMeasurement(self, name, perc = False):
 		"""Get a reading of soil moisture level."""
 
@@ -153,13 +153,13 @@ class MCP3x0x(object):
 			logging.debug(dbgmsg)
 		elif (self.__debug_output == "cons"):
 			print(dbgmsg)
-			
+
 	def __convertToPrec(self, data, places):
 		"""Returns the percentage value of the number."""
 
 		m = ((data * 100) / float(self.__bits))
 		return(round(m, places))
-	
+
 
 class MCP320x(MCP3x0x):
 
@@ -177,9 +177,9 @@ class MCP320x(MCP3x0x):
 		else:
 			return(self.bits - data)
 
-		
+
 class MCP300x(MCP3x0x):
-	
+
 	bits = 1023
 
 	def readChannel(self, name):

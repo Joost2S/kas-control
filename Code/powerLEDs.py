@@ -1,7 +1,7 @@
 #!/usr/bin/python3
- 
+
 # Author: J. Saarloos
-# v0.1.01	03-03-2018
+# v0.1.02	20-05-2018
 
 import logging
 
@@ -30,7 +30,7 @@ class LEDchannel(object):
 	def unset(self):
 
 		if (self.on):
-			self.off()
+			self.turnOff()
 		self.mode = ""
 		self.power = 0
 		self.enabled = False
@@ -58,22 +58,22 @@ class PowerLEDcontroller(object):
 
 
 	def toggle(self, channel):
-		
-		if (0 < chan <= len(self.__channels)):
+
+		if (0 < channel <= len(self.__channels)):
 			if (self.__channels[channel - 1].enabled):
 				if (self.__channels[channel - 1].on):
 					self.__channels[channel - 1].turnOff()
 				else:
 					self.__channels[channel - 1].turnOn()
-					
+
 	def turnOn(self, channel):
-		
-		if (0 < chan <= len(self.__channels)):
+
+		if (0 < channel <= len(self.__channels)):
 			if (self.__channels[channel - 1].enabled):
 				self.__channels[channel - 1].turnOn()
 
 	def turnOff(self, channel):
-		
+
 		if (0 < channel <= len(self.__channels)):
 			if (self.__channels[channel - 1].enabled):
 				self.__channels[channel - 1].turnOff()
@@ -88,7 +88,7 @@ class PowerLEDcontroller(object):
 				self.__channels[channel - 1].set(mode, self.__modes[mode])
 
 	def getState(self, channel):
-		
+
 		if (0 < channel <= len(self.__channels)):
 			state = self.__channels[channel - 1].on
 			mode = self.__channels[channel - 1].mode

@@ -1,15 +1,11 @@
 ﻿#!/usr/bin/python3
- 
+
 # Author: J. Saarloos
-# v0.10.04	29-03-2018
+# v0.10.06	21-05-2018
 
 from collections import OrderedDict
-import csv
-from datetime import datetime, timedelta
+import json
 import logging
-import queue
-import RPi.GPIO as GPIO
-import threading
 import time
 
 import ds18b20
@@ -31,10 +27,10 @@ class hwControl(object):
 	like watering, and making sensordata available to outputs (console/network/display/ledbar).
 	"""
 
-	# Lists and dicts for storing sensors and groups 
+	# Lists and dicts for storing sensors and groups
 	# and accessing them in various ways.
 	__groups = {}				# Dict with group instances. {name : group}
-	__sensors = {}				# {name : type}
+	__sensors = OrderedDict()	# {name : type}
 	__otherSensors = []		# List of sensor names that are not part of any group.
 	__adc = None				# u1
 	__tempMGR =  None			# Manager for DS18B20 temperature sensors
@@ -44,12 +40,12 @@ class hwControl(object):
 	__plcontroller = None	# Reference to powerLED controller
 	__pump = None				# Reference to pump object.
 	__floatSwitch = None		# Reference to floatSwitch object
-	LCD = None				# Reference to LCDcontrol module for HD44780 device.
+	LCD = None				   # Reference to LCDcontrol module for HD44780 device.
 	__LEDbars = {}				# Reference to some LEDbars.
 	__tempbar = []				# List of sensor names for the temperature LEDbar
 	__fan = None				# Reference to fan object.
 	__fanToggleTemp = 45		# Temoerature at which to turn on fan.
-	__powerQueue = None		# Priority queue to keep track of the powerconsuming devices on the 12v rail.
+	__powerManager = None	# Priority queue to keep track of the powerconsuming devices on the 12v rail.
 	__template = ""			# Template for __currentstats
 	__currentstats = ""		# Latest output of the monitor method. Is formatted for display in console.
 	__rawStats = {}			# Dict with the latest results from sensors. {senorName : latestValue}
@@ -62,25 +58,26 @@ class hwControl(object):
 	__spoof = False
 
 	def __init__(self):
-		
+
 		self.__adc = mcp3x08.MCP3208(0, gs.mcplist[0])
-		self.__tempMGR = ds18b20.tdevManager()
 		self.__connectedCheckValue = self.__adc.getResolution() * 0.05
+		self.__tempMGR = ds18b20.tdevManager()
+		self.__setINA219devs()
 		self.__setDataFromFile()
+		if (gs.hwOptions["powermonitor"]):
+			gs.pwrmgr.setINA(self.__ina["12v"])
 		self.__statusLED = globstuff.sigLED(gs.sLEDpin)
 		self.__pump = globstuff.Pump(gs.pumpPin, self.__statusLED)
 		if (gs.hwOptions["floatswitch"]):
 			self.__floatSwitch = globstuff.floatUp(gs.float_switch, self.__pump, self.__statusLED)
 		if (gs.hwOptions["lcd"]):
-			lcd = hd44780.Adafruit_CharLCD(gs.LCD_RS, gs.LCD_E, gs.LCD4, gs.LCD5, gs.LCD6, gs.LCD7, *gs.LCD_SIZE, gs.LCD_L, initial_backlight = 0)
-			self.LCD = lcdcontrol.lcdController(lcd)
+			self.__setLCD()
+		if (gs.hwOptions["ledbars"]):
+			self.__setLEDbars()
 		if (gs.hwOptions["powermonitor"]):
 			self.__plcontroller = powerLEDs.PowerLEDcontroller()
 		if (gs.hwOptions["fan"]):
 			self.__fan = globstuff.Fan(gs.fanPin)
-		if (gs.hwOptions["ledbars"]):
-			self.__tempbar = ["ambientt", "out_shade"]
-		self.__powerQueue = queue.PriorityQueue()
 		self.__setTemplate()
 		self.setTimeRes()
 		gs.control = self
@@ -186,9 +183,9 @@ class hwControl(object):
 		except:
 			logging.error("Error occured during measurement of " + str(type) + " at channel: " + str(name))
 			return(False)
-		
+
 	def __checkPSUtemp(self, temp):
-		
+
 		if (temp > self.__maxPSUtemp):
 			pass
 			#doEmergencyThing()
@@ -228,7 +225,7 @@ class hwControl(object):
 				if (not gs.running):
 					break
 			self.endPumpRequest(name)
-	
+
 	def endPumpRequest(self, group):
 		"""Turn off watering container."""
 
@@ -243,7 +240,7 @@ class hwControl(object):
 			self.__pump.off()
 			time.sleep(0.1)
 		self.valves[group].off()
-			
+
 	def __chekPumpAvail(self, *cur):
 		"""Use this to check if the pump is available for use."""
 
@@ -266,7 +263,8 @@ class hwControl(object):
 		if (gs.hwOptions["powermonitor"]):
 			current = self.__ina["12v"].getCurrent()		# get current power draw from the PSU.
 		else:
-			current = 0
+			if (gs.pwrmgr.addRequest("a", "t", "p", "pri")):
+				pass
 		if (isinstance(cur[0], int)):
 			for c in cur:
 				current += c
@@ -277,23 +275,6 @@ class hwControl(object):
 		if (current > self.__maxPower):
 			return(False)
 		return(True)
-		
-	def startPowerManager(self):
-		"""Use this function to start powerManager to prevent more than 1 instance running at a time."""
-
-		running = False
-		for t in gs.draadjes:
-			if (t.name == "PowerManager" and t.is_alive()):
-				if (running):
-					return
-				running = True
-		self.__checkConnected()
-		self.__powerManager()
-
-	def __powerManager(self):
-
-		while (gs.running):
-			task = self.__powerQueue.get()
 
 	def disable(self):
 
@@ -337,7 +318,7 @@ class hwControl(object):
 
 	def getTriggers(self, group):
 		"""Set a new trigger level for a container."""
-		
+
 		if (group in self.__groups):
 			return(self.__groups[group].lowtrig, self.__groups[group].hightrig)
 		return(None, None)
@@ -354,7 +335,7 @@ class hwControl(object):
 		return("Invalid group.")
 
 	def removePlant(self, group):
-		
+
 		if (group in self.__groups):
 			return(self.__groups[group].removePlant(group))
 
@@ -370,114 +351,130 @@ class hwControl(object):
 
 		for g in self.__groups.values():
 			g.setFromDB()
+			#TODO: set lcd and ledbar trigger levels
 
 	def __setDataFromFile(self):
 		"""Sets all the sensors as defined in the sensors setup file."""
-		
+
+		with open(gs.sensorSetup, "r") as f:
+			data = json.load(f)["sensorData"]
+		for sensorType, setup in data.items():
+			if (sensorType == "light"):
+				self.__setLightSensors(setup)
+			elif (sensorType == "temp"):
+				self.__setTempSensors(setup)
+			if (sensorType == "cputemp"):
+				self.__setLCPUtempSensors(setup)
+			if (sensorType == "flow"):
+				self.__setFlowSensors(setup)
+			if (sensorType == "groups"):
+				self.__setGroupSensors(setup)
+
+	def __setLightSensors(self, setup):
+		""""""
+
+		for sensor in setup["sensors"]:
+			self.__adc.setChannel(sensor["name"], sensor["channel"])
+			self.__sensors[sensor["name"]] = setup["type"]
+			self.__otherSensors.append(sensor["name"])
+
+	def __setTempSensors(self, setup):
+		""""""
+
 		tempAddresses = self.__tempMGR.getTdevList()
-		types = ["temp", "cputemp", "light", "flow", "pwr", "ledbar", "group"]
-		with open(gs.sensSetup, "r", newline = "") as filestream:
-			file = csv.reader(filestream, delimiter = ",")
+		for sensor in setup["sensors"]:
+			if (sensor["address"] in tempAddresses):
+				self.__tempMGR.setDev(sensor["name"], sensor["address"])
+			else:
+				logging.warning("Addres not available: " + sensor["address"])
+			self.__sensors[sensor["name"]] = setup["type"]
+			self.__otherSensors.append(sensor["name"])
 
-			curType = ""	# Keeps track of last encountered data type.
-			for line in file:
-				if (len(line) > 0):
-					# Search for data type. see types[].
-					if (line[0][0] == "#"):
-						if (len(line[0]) > 1):
-							t = line[0][1:].strip()
-							if (t in types):
-								curType = t
-					else:
-						tdev = None
-						output = []
+	def __setLCPUtempSensors(self, setup):
+		""""""
 
-						# Collecting variables...
-						for item in line:
-							output.append(str(item).strip())
+		for sensor in setup["sensors"]:
+			self.__otherSensors.append(sensor["name"])
+			self.__sensors[sensor["name"]] = setup["type"]
 
-						# Setting temp, light and flowsensors.
-						if (curType in types[:-1]):
-							if (curType == "ledbar"):
-								if (gs.hwOptions["ledbars"]):
-									try:
-										self.__setLEDbars(output[0], output[1], output[2:])
-									except Exception as msg:
-										logging.error(msg)
-										raise Exception
-								continue
-							if (curType == "temp"):
-								if (output[1] in tempAddresses):
-									tdev = output[1]
-									self.__tempMGR.setDev(output[0], tdev)
-								else:
-									logging.warning("Addres not available: " + output[1])
-								self.__sensors[output[0]] = curType
-							elif (curType == "cputemp"):
-								tdev = "cpu"
-								self.__sensors[output[0]] = curType
-							elif (curType == "light"):
-								self.__sensors[output[0]] = curType
-								self.__adc.setChannel(output[0], output[1])
-							elif (curType == "flow" and gs.hwOptions["flowsensors"]):
-								self.__flowSensors[output[0]] = flowsensor.flowMeter(output[1])
-							elif (curType == "pwr" and gs.hwOptions["powermonitor"]):
-								self.__setINA219dev(output)
-								continue
-							self.__otherSensors.append(output[0])
-				
-						# Setting sensors of groups and making group instances.
-						else:
-							i = str(len(self.__groups) + 1)
-							name = "group" + i
-							if (output[5] is not None and output[5] in tempAddresses):
-								tdev = output[5]
-							else:
-								tdev = None
-							mname = "soil-g" + i
-							tname = None
-							fname = None
-							self.__setSoilSensor(mname, output[3], output[2], output[1])
-							if (gs.hwOptions["soiltemp"] and tdev is not None):
-								tname = "temp-g" + i
-								self.__sensors[tname] = "temp"
-								self.__tempMGR.setDev(tname, tdev)
-							if (gs.hwOptions["flowSensors"] and output[4] != "None"):
-								fname = "flow-g" + i
-								self.__sensors[fname] = "flow"
-								self.__flowSensors[fname] = flowsensor.flowMeter(output[4])
-							self.__groups[name] = group.Group(name, mname, tname, fname, output[0])
-		self.__sensors = OrderedDict(self.__sensors.items())
+	def __setFlowSensors(self, setup):
+		""""""
 
-	def __setSoilSensor(self, name, channel, ff1, ff2):
-		"""Set the flip-flop pins and ADC channel for the container moisture sensor."""
+		if (gs.hwOptions["flowsensors"]):
+			for sensor in setup["sensors"]:
+				self.__flowSensors[sensor["name"]] = flowsensor.flowMeter(sensor["pin"])
+				self.__sensors[sensor["name"]] = setup["type"]
+				self.__otherSensors.append(sensor["name"])
 
-		gs.getPinDev(ff1).setPin(gs.getPinNr(ff1), False)
-		gs.getPinDev(ff2).setPin(gs.getPinNr(ff2), False)
-		self.__adc.setChannel(name, channel, ff1, ff2, gs.getPinDev(ff1))
-		self.__sensors[name] = "mst"
-		return(name)
+	def __setGroupSensors(self, setup):
+		""""""
 
-	def __setINA219dev(self, output):
-		"""Set the registers of the INA219 device and add voltage and current to sensors."""
+		for data in setup["groupdata"]:
+			if (not data["enabled"]):
+				continue
+			# Setting soil moisture level sensor:
+			mst = data["mstSensor"]
+			# self.__setSoilSensor(mname, output[3], output[2], output[1])
+			gs.getPinDev(mst["ffPin1"]).setPin(gs.getPinNr(mst["ffPin1"]), False)
+			gs.getPinDev(mst["ffPin2"]).setPin(gs.getPinNr(mst["ffPin2"]), False)
+			self.__adc.setChannel(mst["name"], mst["ADCchannel"], mst["ffPin1"],
+			                      mst["ffPin2"], gs.getPinDev(mst["ffPin1"]))
+			self.__sensors[mst["name"]] = "mst"
+			mname = mst["name"]
+			tname = None
+			fname = None
+			# Setting soil temperature sensor:
+			tdev = data["tempSensor"]
+			if (gs.hwOptions["soiltemp"] and tdev["address"] is not None):
+				if (self.__tempMGR.setDev(tdev["name"], tdev["address"])):
+					self.__sensors[tdev["name"]] = "temp"
+					tname = tdev["name"]
+			# Setting water flow meter sensor:
+			fdev = data["flowMeter"]
+			if (gs.hwOptions["flowSensors"] and fdev["pin"] is not None):
+				self.__sensors[fdev["name"]] = "flow"
+				self.__flowSensors[fdev["name"]] = flowsensor.flowMeter(fdev["pin"])
+				fname = fdev["name"]
+			# Creating group instance.
+			self.__groups[setup["name"]] = group.Group(data["name"], mname,
+										tname, fname, data["valvepin"])
 
-		self.__ina[output[0]] = ina219.INA219(int(output[1]), int(output[2]))
-		self.__ina[output[0]].setConfig(int(output[3]), int(output[4]), int(output[5]), int(output[6]))
-		self.__ina[output[0]].setCalibration(int(output[7]), float(output[8]))
-		self.__ina[output[0]].engage()
-		self.__sensors[output[0] + "v"] = "pwr"
-		self.__otherSensors[output[0] + "v"] = "pwr"
-		self.__sensors[output[0] + "c"] = "pwr"
-		self.__otherSensors[output[0] + "c"] = "pwr"
-		
-	def __setLEDbars(self, name, icount, pins):
+	def __setINA219devs(self):
+		"""Set the registers of the INA219 devices and add voltage and current to sensors."""
+
+		with open(gs.sensorSetup, "r") as f:
+			data = json.load(f)
+		for dev in data["ina219"]["devices"]:
+			self.__ina[dev["name"]] = ina219.INA219(dev["address"], dev["voltage"])
+			self.__ina[dev["name"]].setConfig(dev["PGA"], dev["BADC"], dev["SADC"], dev["mode"])
+			self.__ina[dev["name"]].setCalibration(dev["maxCurrent"], dev["rShunt"])
+			self.__ina[dev["name"]].engage()
+			self.__sensors[dev["name"] + "v"] = "pwr"
+			self.__otherSensors.append(dev["name"] + "v")
+			self.__sensors[dev["name"] + "c"] = "pwr"
+			self.__otherSensors.append(dev["name"] + "c")
+
+	def __setLCD(self):
+
+		with open(gs.sensorSetup, "r") as f:
+			data = json.load(f)["lcd"]
+
+		lcd = hd44780.Adafruit_CharLCD(data["pins"], data["size"]["cols"],
+		                               data["size"]["rows"], initial_backlight = 0)
+		self.LCD = lcdcontrol.lcdController(lcd)
+		self.LCD.setNames(data["defaultSensors"])
+
+	def __setLEDbars(self):
 		"""Sets the values and bounds for the LEDbars to display."""
-		
-		self.__LEDbars[name] = ledbar.LEDbar(pins, icount)
-		if (name == "temps"):
-			self.__LEDbars[name].setNames([["board", 18, 27], ["ambientt", 18, 27]])
-		else:
-			self.__LEDbars[name].setNames(gs.defaultLCDsensors)
+
+		with open(gs.sensorSetup, "r") as f:
+			data = json.load(f)
+		for bar in data["ledbars"]["bars"]:
+
+			self.__LEDbars[bar["name"]] = ledbar.LEDbar(bar["pins"], bar["Icount"], bar["startAtEnd"])
+			self.__LEDbars[bar["name"]].setNames(bar["sensors"])
+			# else:
+			# 	self.__LEDbars[bar[""]].setNames()
 
 	def __setTemplate(self):
 		"""Generates the template for the formatted currentstats."""
@@ -538,7 +535,7 @@ class hwControl(object):
 				running = True
 		self.__checkConnected()
 		self.__monitor()
-		
+
 	def __monitor(self):
 		"""\t\tMain monitoring method. Will check on the status of all sensors every %timeRes seconds.
 		Will also start methods/actions based on the sensor input."""
@@ -554,7 +551,7 @@ class hwControl(object):
 		#	|{ambient}|{sun}	|{shade}	|{ambient}|{cpu}	|{PSU}	|{total}	|{5v}		|{5v}		|{12v}	|{12v}
 		#	|{light}	|{temp}	|{temp}	|{temp}	|{temp}	|{temp}	|{water}	|{power}	|{volt}	|{power}	|{volt}
 
-		
+
 		#	Indicate to user that the system is up and running.
 		if (gs.hwOptions["lcd"]):
 			self.LCD.toggleBacklight()
@@ -586,22 +583,22 @@ class hwControl(object):
 						data[g.flowName] = f
 					if (not gs.running):
 						return
-				
+
 				# Get data from other sensors.
 				for sname in self.__otherSensors:
 					if (self.__sensors[sname] == "light"):
 						data[sname] = self.requestData(name = sname, perc = True)
 					else:
 						data[sname] = self.requestData(name = sname)
-						
+
 				# Outputting data to availabe outouts:
 				self.__rawStats = data
-				if (gs.hwOptions["lcd"]):
-					self.LCD.updateScreen()
-				if (gs.hwOptions["ledbars"]):
-					for bar in self.__LEDbars.values():
-						bar.updateBar()
-					
+				# if (gs.hwOptions["lcd"]):
+				# 	self.LCD.updateScreen()
+				# if (gs.hwOptions["ledbars"]):
+				# 	for bar in self.__LEDbars.values():
+				# 		bar.updateBar()
+
 				# Formatting data.
 				for name, value in data.items():
 					if (name == "time"):
@@ -610,13 +607,12 @@ class hwControl(object):
 				self.__currentstats = self.__template.format(**data)
 				print(self.__currentstats)
 
+				# Emitting event to alert devices of new data
+				gs.ee.emit("hwMonitorDataUpdate")
+
 				# Waiting for next interval of timeRes to start next itertion of loop.
-				while (int(time.time()) % self.__timeRes != self.__timeRes - 1):
-					time.sleep(1)
-					if (not gs.running):
-						return
-				while (not int(time.time()) % self.__timeRes == 0):
-					time.sleep(0.01)
+				if ((not gs.running) or gs.wait(self.__timeRes)):
+					return
 				# End of loop
 
 		except KeyboardInterrupt:
@@ -624,7 +620,7 @@ class hwControl(object):
 		finally:
 			for t in gs.wtrThreads:
 				t.join()
-			
+
 	def __perc(self, value, decimals = 1):
 		"""Returns the value as percentage of the ADC resolution."""
 
@@ -642,7 +638,7 @@ class hwControl(object):
 					logging.debug("{} disabled".format(g.groupname))
 				else:
 					logging.debug("{} enabled".format(g.groupname))
-				
+
 	def lcdNames(self, names):
 
 		self.LCD.names(names)
@@ -676,10 +672,10 @@ class hwControl(object):
 
 	def powerLEDset(self, channel, mode):
 		"""Set powerLED channel to mode: '1ww', '3ww', '3ir' to enable channel."""
-		
+
 		if (0 < channel <= len(gs.powerLEDpins)):
 			self.__plcontroller.setLED(channel, mode)
-	
+
 	def powerLEDstate(self, channel):
 		"""Returns state, mode and power of the powerLEDchannel."""
 
@@ -695,7 +691,7 @@ class hwControl(object):
 		If no time argument is given, the system will default to the amount
 		of ds18b20 sensors in seconds, with a minimum of 5 seconds.
 		"""
-		
+
 		tempsensors = len(self.__tempMGR.getTdevList())
 		if (time is None):
 			if (tempsensors < 5):
@@ -706,7 +702,7 @@ class hwControl(object):
 			time = int(time)
 			if (time >= 5 and time >= tempsensors * 0.8):
 				self.__timeRes = float(time)
-			
+
 	def isPumpEnabled(self):
 		"""Returns pump availability"""
 
@@ -725,7 +721,7 @@ class hwControl(object):
 				names.append(g.flowName.replace("-", "_"))
 			data[n] = names
 		return(data)
-	
+
 	def getSensors(self):
 		"""Data for setting up database."""
 
@@ -787,7 +783,7 @@ class hwControl(object):
 
 	def shutdown(self):
 		"""Reset and turn off all in- and outputs when shutting down the system."""
-		
+
 		if (gs.hwOptions["lcd"]):
 			self.LCD.disable()
 		if (gs.hwOptions["ledbars"]):
@@ -799,11 +795,14 @@ class hwControl(object):
 		for g in self.__groups.values():
 			g.valve.off()
 		# reset INA219 devices if option.
-		for ina in self.__ina.values():
-			ina.reset()
+		if (gs.hwOptions["powermonitor"]):
+			for ina in self.__ina.values():
+				ina.reset()
 		if (gs.hwOptions["status LED"]):
 			self.__statusLED.disable()
-			
+		for mcp in gs.mcplist:
+			mcp.allOff()
+
 
 class Monitor(globstuff.protoThread):
 	def run(self):

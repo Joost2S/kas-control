@@ -71,34 +71,34 @@ LCD_ROW_OFFSETS         = (0x00, 0x40, 0x14, 0x54)
 class Adafruit_CharLCD(object):
 	"""Class to represent and interact with an HD44780 character LCD display."""
 
-	def __init__(self, rs, en, d4, d5, d6, d7, cols, lines, backlight = None,
-                    invert_polarity = True, gpio = GPIO, initial_backlight = 1.0):
+	def __init__(self, pins, cols, lines, invert_polarity = True,
+	             gpio = GPIO, initial_backlight = 1.0):
 
 		"""Initialize the LCD.  RS, EN, and D4...D7 parameters should be the pins
 		connected to the LCD RS, clock enable, and data line 4 through 7 connections.
 		The LCD will be used in its 4-bit mode so these 6 lines are the only ones
 		required to use the LCD.  You must also pass in the number of columns and
-		lines on the LCD.  
+		lines on the LCD.
 
 		If you would like to control the backlight, pass in the pin connected to
 		the backlight with the backlight parameter.  The invert_polarity boolean
-		controls if the backlight is one with a LOW signal or HIGH signal.  The 
+		controls if the backlight is one with a LOW signal or HIGH signal.  The
 		default invert_polarity value is True, i.e. the backlight is on with a
-		LOW signal.  
+		LOW signal.
 
-		You can enable PWM of the backlight pin to have finer control on the 
-		brightness.  To enable PWM make sure your hardware supports PWM on the 
+		You can enable PWM of the backlight pin to have finer control on the
+		brightness.  To enable PWM make sure your hardware supports PWM on the
 		provided backlight pin and set enable_pwm to True (the default is False).
 		The appropriate PWM library will be used depending on the platform, but
 		you can provide an explicit one with the pwm parameter.
 
-		The initial state of the backlight is ON, but you can set it to an 
+		The initial state of the backlight is ON, but you can set it to an
 		explicit initial state with the initial_backlight parameter (0 is off,
 		1 is on/full bright).
 
 		You can optionally pass in an explicit GPIO class,
 		for example if you want to use an MCP230xx GPIO extender.  If you don't
-		pass in an GPIO instance, the default GPIO for the running platform will
+		pass in a GPIO instance, the default GPIO for the running platform will
 		be used.
 		"""
 		# Save column and line state.
@@ -106,24 +106,24 @@ class Adafruit_CharLCD(object):
 		self._lines = lines
 		# Save GPIO state and pin numbers.
 		self._gpio = gpio
-		self._rs = rs
-		self._en = en
-		self._d4 = d4
-		self._d5 = d5
-		self._d6 = d6
-		self._d7 = d7
+		self._rs = pins["LCD_RS"]
+		self._en = pins["LCD_E"]
+		self._d4 = pins["LCD4"]
+		self._d5 = pins["LCD5"]
+		self._d6 = pins["LCD6"]
+		self._d7 = pins["LCD7"]
 		# Save backlight state.
-		self._backlight = backlight
-		self._pwm_enabled = enable_pwm
-		self._pwm = pwm
+		self._backlight = pins["LCD_L"]
+		# self._pwm_enabled = enable_pwm
+		# self._pwm = pwm
 		self._blpol = not invert_polarity
 		# Setup all pins as outputs.
-		for pin in (rs, en, d4, d5, d6, d7):
+		for pin in (pins.values()):
 			gpio.setup(pin, GPIO.OUT)
 		# Setup backlight.
-		if backlight is not None:
-			gpio.setup(backlight, GPIO.OUT)
-			gpio.output(backlight, self._blpol if initial_backlight else not self._blpol)
+		if self._backlight is not None:
+			gpio.setup(self._backlight, GPIO.OUT)
+			gpio.output(self._backlight, self._blpol if initial_backlight else not self._blpol)
 		# Initialize the display.
 		self.write8(0x33)
 		self.write8(0x32)

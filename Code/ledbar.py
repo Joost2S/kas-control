@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.6.02	01-04-2018
+# v0.6.03	21-05-2018
 
 import logging
 
@@ -122,19 +122,20 @@ class LEDbar(object):
 		for pin in pins:
 			gs.getPinDev(pin).setPin(gs.getPinNr(pin), False)
 
+		gs.ee.on("hwMonitorDataUpdate", self.updateBar)
 
-	def setNames(self, names):
 
-		# names = [[name, lower, upper], [name, lower, upper],..]
-		if (len(names) > 0):
-			if (len(names) > (2 ** len(self.iPins))):
-				names = names[:2 ** len(self.iPins)]
+	def setNames(self, sensors):
+
+		if (len(sensors) > 0):
+			if (len(sensors) > (2 ** len(self.iPins))):
+				sensors = sensors[:2 ** len(self.iPins)]
 				logging.warning("Not enough indicator LEDs are defined. Not all sensors will be displayed.")
 			self.names = []
-			for name in names:
-				self.names.append(name[0])
+			for sensor in sensors:
+				self.names.append(sensor["name"])
 				self.displayed.append(False)
-				self.bounds.append(name[1:])
+				self.bounds.append([sensor["min"], sensor["max"]])
 
 	def updateBounds(self, name, low, high):
 		"""Set bound levels based on the channel's trigger values."""

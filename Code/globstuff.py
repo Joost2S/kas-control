@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
- 
+
 # Author: J. Saarloos
-# v0.8.22	08-03-2018
+# v0.8.25	21-05-2018
 
 
 from abc import ABCMeta, abstractmethod
@@ -9,14 +9,17 @@ import datetime
 import logging
 import os
 import RPi.GPIO as GPIO
+import smtplib
 import subprocess
 import sys
 import threading
 import time
 
+from pymitter import EventEmitter
+
 import mcp23017
 
-		
+
 class sigLED(object):
 	"""This object is for controlling the status LED."""
 
@@ -55,7 +58,7 @@ class sigLED(object):
 			time.sleep(self.interval * 2)
 			self.off()
 			time.sleep(self.interval * 2)
-			
+
 	def blinkFast(self, i):
 		for j in range(0, i):
 			self.on()
@@ -74,7 +77,7 @@ class sigLED(object):
 	def off(self):
 		GPIO.output(self.pin, GPIO.LOW)
 
-	
+
 class floatUp(object):
 	"""Object for handeling a low water level."""
 
@@ -117,14 +120,14 @@ class floatUp(object):
 		GPIO.add_event_detect(self.float_switch, GPIO.RISING, callback=(self.lwstart), bouncetime=1000)
 		if (self.getStatus()):
 			self.lwstart()
-		
+
 
 	def getStatus(self):
 		"""\t\tChecks and returns the current status of the float switch.
 		True if low water, False if enough water."""
 
 		return(GPIO.input(self.float_switch))
-	
+
 	def lwstart(self, mail = False):
 		"""If low water level is detected, run this to disable pumping and send an email to user."""
 
@@ -161,7 +164,7 @@ class floatUp(object):
 					server.sendmail(fromaddr, toaddr, msg)
 					server.quit()
 					logging.debug("Sent mail to " + toaddr)
-					
+
 	def checkLevel(self):
 		"""\t\tRun as seperate thread when a low water level situation occurs.
 		Will self terminate when the water level is high enough again."""
@@ -217,39 +220,39 @@ class lowWater(protoThread):
 		logging.info("Starting thread{0}: {1}".format(self.threadID, self.name))
 		globstuff.fltdev.checkLevel()
 		logging.info("Exiting thread{0}: {1}".format(self.threadID, self.name))
-		
+
 
 class Pump(object):
 	"""Object encompassing the pump and all valves."""
-	
+
 	# enabled
 	@property
 	def enabled(self):
 		return(self.__enabled)
 	@enabled.setter
 	def enabled(self, enabled):
-		self.__enabled = enabled	  
+		self.__enabled = enabled
 	# startTime
 	@property
 	def startTime(self):
 		return(self.__startTime)
 	@startTime.setter
 	def startTime(self, startTime):
-		self.__startTime = startTime	  
+		self.__startTime = startTime
 	# pumpPin
 	@property
 	def pumpPin(self):
 		return(self.__pumpPin)
 	@pumpPin.setter
 	def pumpPin(self, pumpPin):
-		self.__pumpPin = pumpPin	  
+		self.__pumpPin = pumpPin
 	# isPumping
 	@property
 	def isPumping(self):
 		return(self.__isPumping)
 	@isPumping.setter
 	def isPumping(self, isPumping):
-		self.__isPumping = isPumping	  
+		self.__isPumping = isPumping
 	# sLED
 	@property
 	def sLED(self):
@@ -283,34 +286,9 @@ class Pump(object):
 		if (not globstuff.testmode):
 			self.enabled = True
 
-	# Move to hwcontrol
-	def demo(self, groups, t):
-		"""When in testmode, you can test the watering hardware."""
-
-		if (globstuff.testmode):
-			for g in groups:
-				self.__valveOn(g.chan)
-			time.sleep(0.1)
-			self.__pumpOn()
-			time.sleep(t)
-			self.__pumpOff()
-			time.sleep(0.1)
-			for g in groups:
-				self.__valveOff(g.chan)
-			time.sleep(0.8)
-			for g in groups:
-				self.__valveOn(g.chan)
-				time.sleep(0.1)
-				self.__pumpOn()
-				time.sleep(t)
-				self.__pumpOff()
-				time.sleep(0.1)
-				self.__valveOff(g.chan)
-				time.sleep(1.2)
-
 	def on(self):
 		"""Turn the pump on."""
-		
+
 		if (self.enabled):
 			logging.info("Pump turned on.")
 			self.isPumping = True
@@ -325,34 +303,33 @@ class Pump(object):
 		self.isPumping = False
 		if (self.sLED is not None):
 			self.sLED.off()
-			
+
 		globstuff.getPinDev(self.pumpPin).output(globstuff.getPinNr(self.pumpPin), False)
 		if (self.startTime is not None):
 			logging.info("Pump turned off. Pumped for " + str(round(time.time() - self.startTime, 2)) + " seconds.")
 			self.startTime = None
-			
+
 
 class Fan(object):
 
-	__mcp = None
-	__pin = ""
 	__state = False
-	power = 65
+	__power = 65
+	__requestUUID = None
 
-	def __init(self, pin):
-		
-		if (globstuff.getPinDev(pin).setPin(globstuff.getPinNr(pin), False)):
-			self.__mcp = globstuff.getPinDev(pin)
-			self.__pin = globstuff.getPinNr(pin)
+	def __init__(self, pin):
 
+		self.__requestUUID = globstuff.pwrmgr.pinSetup(pin)
+		if (self.__requestUUID is False):
+			globstuff.shutdown()
 
 	def on(self):
-		self.__state = True
-		self.__mcp.output(self.__pin, True)
+
+		if (globstuff.pwrmgr.addRequest(self.__requestUUID, 0, self.__power, "critical")):
+			self.__state = True
 
 	def off(self):
 		self.__state = False
-		self.__mcp.output(self.__pin, False)
+		globstuff.pwrmgr.cancelRequest(self.__requestUUID)
 
 	def getState(self):
 
@@ -372,14 +349,9 @@ class globstuff:
 				  "fan" : True,
 				  }
 
-	defaultLCDsensors = [["soil_g1", "sl-1"], ["soil_g2", "sl-2"], ["soil_g3", "sl-3"],
-							["soil_g4", "sl-4"], ["soil_g5", "sl-5"], ["soil_g6", "sl-6"],
-							["ambientt", "Tin"], ["sun", "Tout"], ["board", "brd"], ["CPU", "cpu"],
-							["5vc", "5vc"], ["12vc", "12vc"], ["total", "wtr"]]
-
 	# Locations of files.
 	dataloc = str(os.path.dirname(os.path.realpath(__file__))) + "/datafiles/"
-	sensSetup = dataloc + "sensorSetup.csv"
+	sensorSetup = dataloc + "sensorSetup.json"
 	logfile = dataloc + "kascontrol.log"
 
 	# Misc GPIO pin assignments:
@@ -390,16 +362,6 @@ class globstuff:
 	float_switch = 22					# Float switch pin, goes high if there is too little water in the storage tank.
 	intPinU4 = 5						# Interrupt pin for mcp23017 0x20, U4
 	intPinU5 = 25						# Interrupt pin for mcp23017 0x23, U5
-			
-	# LCD pins:
-	LCD4 = 26
-	LCD5 = 16
-	LCD6 = 21
-	LCD7 = 20
-	LCD_E = 19
-	LCD_RS = 13
-	LCD_L = 12
-	LCD_SIZE = [16, 2]
 
 	powerLEDpins = ["43", "42", "41", "40"]
 
@@ -408,8 +370,9 @@ class globstuff:
 	# Networking vars:
 	host = ""							# Hostname.
 	port = 7500							# Default network port. If already used, can go up to port 7504
-	
+
 	# Misc vars
+	ee = EventEmitter()           # PyMitter event manager.
 	draadjes = []						# List with all the active threads.
 	wtrThreads = []					# List with all watering threads.
 	threadnr = 0						# Keep track of the thread number.
@@ -430,10 +393,11 @@ class globstuff:
 
 	# Major modules:
 	control = None						# Reference to the hwcontrol instance.
+	pwrmgr = None                 # Reference to the powerManager instance.
 	db = None							# Reference to database instance.
 	webgraph = None					# Reference to webgraph instance.
 	server = None						# Reference to the server object.
-		
+
 	def getPinNr(pin):
 		"""Returns the pin number without device number."""
 
@@ -441,20 +405,20 @@ class globstuff:
 
 	def getPinDev(pin):
 		"""Returns the mpc23017 device for the corresponding pin."""
-		
+
 		try:
 			return(globstuff.mcplist[int(pin[0])])
 		except ValueError:
 			logging.error("Invalid MCP23017 instance: " + str(pin))
 			return(None)
-			
+
 	def getThreadNr():
 		"""Just counts the threads."""
 
 		globstuff.threadnr +=1
 		return(globstuff.threadnr)
-		
-	def convertToPrec(self, data, places):
+
+	def convertToPrec(data, places):
 		"""Returns the percentage value of the number."""
 
 		m = ((data * 100) / float(globstuff.control.getADCres()))
@@ -467,7 +431,7 @@ class globstuff:
 		cpu_temp = tempFile.read()
 		tempFile.close()
 		return(round(float(cpu_temp)/1000, 1))
-	
+
 	def getTabs(txt, tabs = 2, tablength = 8):
 		"""Returns a string of a fixed length for easier formatting of tables. Assuming your console has a tab length of 8 chars."""
 
@@ -485,7 +449,7 @@ class globstuff:
 		else:
 			return(txt + " " * (tabs * tablength - len(txt)))
 
-	def timediff(diff):
+	def timediff(diff, fractions=0):
 		"""Converts seconds into dd, HH:MM:SS"""
 
 		days = 0
@@ -515,14 +479,27 @@ class globstuff:
 					minutes = "00"
 				else:
 					minutes = ("0" + str(minutes))
-		seconds = int(diff)
+		if (fractions <= 0):
+			seconds = int(diff)
+		else:
+			seconds = round(diff, fractions)
 		if (seconds < 10):
-			if (seconds == 0):
-				seconds = "00"
-			else:
-				seconds = ("0" + str(seconds))
+			# if (seconds == 0):
+			# 	seconds = "00"
+			# else:
+			seconds = ("0" + str(seconds))
 		return((days, hours, minutes, seconds))
-	
+
+	def wait(interval):
+		"""Waiting for next interval of timeRes to start next itertion of loop."""
+
+		while (int(time.time()) % interval != interval - 1):
+			time.sleep(1)
+			if (not globstuff.running):
+				return(True)
+		while(not int(time.time()) % interval == 0):
+			time.sleep(0.01)
+
 	def shutdown():
 		"""\t\tUse this method to either shutdown this software or,
 		with '-x' or '-r' as argument, shutdown or reboot
@@ -534,10 +511,10 @@ class globstuff:
 		for t in globstuff.draadjes:
 				t.join()
 		print("Cleaning up and exiting Main Thread")
-		for mcp in globstuff.mcplist:
-			mcp.allOff()
 		globstuff.server.sslSock.close()
 		globstuff.control.shutdown()
+		for mcp in globstuff.mcplist:
+			mcp.allOff()
 		GPIO.cleanup()
 		print("Cleanup done.")
 		if (globstuff.shutdownOpt == "-r" or globstuff.shutdownOpt == "-x"):

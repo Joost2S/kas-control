@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
- 
+
 # Author: J. Saarloos
-# v1.4.2	08-03-2018
+# v1.4.3	21-05-2018
 
 """
 Small module to control and use the DS18B20 temperature sensor.
@@ -14,7 +14,7 @@ import logging
 
 
 class ds18b20(object):
-	
+
 	dir = ""
 	addr = ""
 	name = ""
@@ -82,7 +82,7 @@ class tdevManager(object):
 		return(self.__devAddrs)
 
 	def getMeasurement(self, name):
-		
+
 		if (name in self.__devList.keys()):
 			return(self.__devList[name].getTemp())
 		return(None)
@@ -94,16 +94,17 @@ class tdevManager(object):
 				for dev in self.__devList.values():
 					if (dev.addr == addr):
 						logging.error("Device with address {} is already assigned.".format(addr))
-						return
+						return(False)
 				self.__devList[name] = ds18b20(addr, name)
-			else:
-				logging.error("Name {} already exists. Please enter a unique name for each device.".format(name))
+				return(True)
+			logging.error("Name {} already exists. Please enter a unique name for each device.".format(name))
+			return(False)
 
 
 if __name__ == "__main__":
 	import sys
 	import time
-	
+
 	mgr = tdevManager()
 	devNames = []
 	template = ""

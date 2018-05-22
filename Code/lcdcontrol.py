@@ -1,7 +1,7 @@
 #!/usr/bin/python3
- 
+
 # Author: J. Saarloos
-# v0.6.01	09-03-2018
+# v0.6.02	21-05-2018
 
 import logging
 import time
@@ -26,7 +26,7 @@ class lcdController(object):
 	__startMSGdisp = gs.boottime
 	__displayMSGfor = 15
 	__template = []
-	
+
 	def __init__(self, lcd):
 		self.__LCD = lcd
 		self.__LCD.enable_display(True)
@@ -38,10 +38,11 @@ class lcdController(object):
 		elif (self.rows == 4 and self.cols == 20):
 			self.slotsAvailable = 8
 			self.slotsPerRow = 4
+		gs.ee.on("hwMonitorDataUpdate", self.updateScreen)
 
 	def __setTemplate(self):
 		"""Sets the template to display sensor data on the LCD."""
-		
+
 		template = []
 		self.slotsUsed = self.slotsAvailable
 		if (len(self.names) < self.slotsAvailable):
@@ -61,7 +62,7 @@ class lcdController(object):
 
 	def __addLines(self, slots):
 		"""Returns 2 formatted rows with placeholders for format() of requested length."""
-		
+
 		template = []
 		template.append("")
 		template.append("")
@@ -84,7 +85,7 @@ class lcdController(object):
 				return
 		n = []
 		v = []
-		names = self.names
+		names = []
 		index = self.slotsUsed
 		values = gs.control.requestData(caller = "display")
 		# Select names to be displayed if not all names are displayed at once.
@@ -115,8 +116,8 @@ class lcdController(object):
 			index = self.slotsPerRow
 		for i in range(self.slotsUsed):
 			try:
-				n.append(gs.getTabs(names[i][1], 1, 4))
-				v.append(gs.getTabs(values[names[i][0]], 1, 4))
+				n.append(gs.getTabs(names[i]["displayName"], 1, 4))
+				v.append(gs.getTabs(values[names[i]["sensorName"]], 1, 4))
 			except KeyError:
 				n.append(gs.getTabs("", 1, 4))
 				v.append(gs.getTabs("", 1, 4))
@@ -137,7 +138,7 @@ class lcdController(object):
 
 		self.names = []
 		for name in names:
-			if (name[0] in gs.control.getSensors().keys()):
+			if (name["sensorName"] in gs.control.getSensors().keys()):
 				self.names.append(name)
 		self.__setTemplate()
 		self.__scrollIndex = 0

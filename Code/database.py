@@ -1,7 +1,7 @@
 #!/usr/bin/python3
- 
+
 # Author: J. Saarloos
-# v0.4.04	08-03-2018
+# v0.4.06	20-05-2018
 
 from collections import OrderedDict
 from datetime import datetime, timedelta
@@ -15,9 +15,9 @@ import time
 import globstuff
 from globstuff import globstuff as gs
 
-	
+
 class Database(object):
-	
+
 	__allowedTypes = ["mst", "light", "flow", "temp", "cputemp", "pwr"]
 	__sensors = {"ambientl" : "light",
 				 "ambientt" : "temp",
@@ -81,7 +81,7 @@ class Database(object):
 		self.__fields = self.__dbRead(query1)
 
 	def __checkFields(self):
-		"""\t\tRun on boot. Check wether the data format in the DB is the same as
+		"""\t\tRun on boot. Check whether the data format in the DB is the same as
 		the sensor setup of the main program.
 		Set plantnames and triggers in gs.control.__groups{} at the end."""
 
@@ -97,7 +97,7 @@ class Database(object):
 			raise dbVaildationError
 
 	def __dropTables(self):
-		
+
 		template1 = "SELECT * FROM sqlite_master WHERE type = '{}' AND name = '{}'"
 		template2 = "DROP {} {};"
 		dbmsg1 = "DROP VIEW defaultview;"
@@ -151,7 +151,7 @@ class Database(object):
 		sensorSetup += "sensorType TEXT NOT NULL, "
 		sensorSetup += "groupID INTEGER REFERENCES groups(groupID) NULL, "
 		sensorSetup += "resolution INTEGER NULL);"
-			
+
 		# Gathering data for sensorSetup table...
 		sensorSData = []
 		for i, fn, ft in enumerate(self.__sensors.items()):
@@ -165,13 +165,13 @@ class Database(object):
 					break
 			sensorSData.append("INSERT INTO sensorSetup(sensorName, sensorType, groupID, resolution)")
 			sensorSData[i] += " VALUES ('{}', '{}', {}, {});".format(fn, ft, subquery, res)
-		
+
 		# Creating groups table...
 		groups  = "CREATE TABLE groups ("
 		groups += "groupID INTEGER PRIMARY KEY, "
 		groups += "groupName TEXT NOT NULL, "
 		groups += "plantID INTEGER REFERENCES plants(plantID) NULL);"
-			
+
 		# Gathering data for groups table...
 		groupsData = []
 		for i, g in enumerate(self.__groups):
@@ -188,12 +188,12 @@ class Database(object):
 		plants += "datePlanted DATE NOT NULL, "
 		plants += "dateRemoved DATE NULL, "
 		plants += "groupID INTEGER REFERENCES groups(groupID) NOT NULL);"
-		
+
 		# Creating plantTypes table...
 		plantTypes  = "CREATE TABLE plantTypes ("
 		plantTypes += "typeID INTEGER PRIMARY KEY, "
 		plantTypes += "species TEXT NOT NULL);"
-		
+
 		# Gathering data for plantTypes table...
 		plantTData = []
 		for s in self.__species:
@@ -218,7 +218,7 @@ class Database(object):
 		defaultview += "LEFT JOIN plants AS p ON g.plantID = p.plantID "
 		defaultview += "LEFT JOIN plantTypes AS pt ON p.plantType = pt.typeID "
 		defaultview += "GROUP BY g.groupID;"
-		
+
 		# add sensorCheck view...
 		sensorCheck  = "CREATE VIEW sensorCheck AS "
 		sensorCheck += "SELECT s.sensorName, s.sensorType, g.groupName, s.resolution "
@@ -228,14 +228,14 @@ class Database(object):
 		self.__dbWrite(sensorData, groups, sensorSetup, groupsData, sensorSData,
 							plants, plantTypes, plantTData, watering,
 							defaultview, sensorCheck)
-		
+
 	def addPlant(self, name, group, species = None):
 		"""
 		Use this method when adding a new plant to a container.
 		If a plant is already assigned to the specified container,
 		plant will not be added. Use removePlant() first.
 		"""
-		
+
 		self.lastAction = "Add plant"
 		self.__printutf("\t\tAdd Plant. " + str(name))
 		if (species is None):
@@ -271,7 +271,7 @@ class Database(object):
 		self.__dbWrite(dbmsg2, dbmsg3)
 		self.lastResult = True
 		return(True)
-		
+
 	def __addSpecies(self, species):
 
 		self.__species.append(species)
@@ -374,7 +374,7 @@ class Database(object):
 		return(data1, data2)
 
 	def getTriggers(self, group):
-		
+
 		if (not group in self.__groups.keys()):
 			self.lastResult = False
 			return("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
@@ -396,7 +396,7 @@ class Database(object):
 
 	def getContainerHistory(self, group):
 		"""Returns the names and some info of all the plants associated with a conainer."""
-		
+
 		if (not group in self.__groups.keys()):
 			self.lastResult = False
 			return("Unknown group. Please enter valid group number. 1 - {}".format(len(self.__groups)))
@@ -478,7 +478,7 @@ class Database(object):
 #			finally:
 #				conn.close()
 		return(dat)
-			
+
 	def __dbWrite(self, *dbmsgs):
 		"""Use this method to write data to the DB."""
 
@@ -499,7 +499,7 @@ class Database(object):
 			logging.debug("er:", er.message)
 			return(0)
 		return(updRows)
-		
+
 	def __sortmsgs(self, *dbmsgs):
 		"""Recursive methed to extract all strings from arbitrarily nested arrays."""
 
@@ -527,7 +527,7 @@ class Database(object):
 
 		if (interval >= 1.0):
 			self.__interval = int(interval * 60)
-	
+
 	def getContainerNameTriggers(self, container):
 		"""Returns [plantname, lowtrig, hightrig]"""
 
@@ -542,7 +542,7 @@ class Database(object):
 
 	def startDatalog(self):
 		"""Use this function to start datalog to prevent more than 1 instance running at a time."""
-		
+
 		running = False
 		for t in gs.draadjes:
 			if (t.name == "Datalog" and t.is_alive()):
@@ -555,7 +555,7 @@ class Database(object):
 		"""This is the main datalogging method. Every %interval minutes the data will be recorded into the database."""
 
 		# Waiting to ensure recordings are synced to __interval
-		if (self.__wait()):
+		if (gs.wait(self.__interval)):
 			return
 
 		# Datalogging loop.
@@ -568,18 +568,8 @@ class Database(object):
 					txt2 += ", " + str(self.__getValue(n))
 				dbmsg = (txt1 + txt2 + ");")
 				self.__dbWrite(dbmsg)
-			if ((not gs.running) or self.__wait()):
+			if ((not gs.running) or gs.wait(self.__interval)):
 				return
-
-	def __wait(self):
-		"""Waiting for next interval of timeRes to start next itertion of loop."""
-
-		while (int(time.time()) % self.__interval != self.__interval - 1):
-			time.sleep(1)
-			if (not gs.running):
-				return(True)
-		while(not int(time.time()) % self.__interval == 0):
-			time.sleep(0.01)
 
 	def __getValue(self, name):
 		"""Takes a measurement of the value on the corresponding type and channel requested."""
@@ -592,8 +582,8 @@ class Database(object):
 				return(data)
 		logging.warning("Failed to get a measurement for sensor {}.".format(name))
 		return("NULL")
-		
-	
+
+
 class Datalog(globstuff.protoThread):
 	def run(self):
 		logging.info("Starting thread{0}: {1}".format(self.threadID, self.name))
@@ -606,7 +596,7 @@ class Datalog(globstuff.protoThread):
 			self.run()
 		finally:
 			logging.info("Exiting thread{0}: {1}".format(self.threadID, self.name))
-	
+
 
 class dbVaildationError(Exception):
 	pass

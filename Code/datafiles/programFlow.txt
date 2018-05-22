@@ -1,18 +1,17 @@
 - start of program
 - kascontrol.py -->
-	- init on import of globstuff -->
+	- init on import globstuff -->
 		- init of GPIO expanders
+
 	- init hwcontrol -->
 		#-- All objects that need GPIO pins are required to set those in the init.
 		- init adc
 		- set connectedValue as .05 * adc resolution
 		- init tempManager
-		- init statusLED
-		- init powerLEDS
-		- init pump
-		- init float switch
-		- init of 16x02/20x04 LCD
-		- read sensorSetup.csv -->
+		- init INA219 devices
+        - init of powerManager -->
+            - set gs.pwrmgr to reference to powerManager instance
+		- read sensorSetup.json -->
 			- (add name of all sensors to sensors[name] = sensorType)
 			- (add name of sensors not belonging to groups to otherSensors[])
 			- init tempsensors and add to tempManager and add to groups if applicable
@@ -23,22 +22,30 @@
 			- set moistchannels in adc and add to groups
 			- init groups -->
 				- init associated valve
-			- init of LEDbars
+		- init statusLED
+		- init pump
+		- init float switch
+		- init of 16x02/20x04 LCD
+        - init of LEDbars
+		- init powerLEDS
+		- init of fan
 		- set gs.control to reference to hwcontrol instance
-		
+
 	- init of database -->
-		- if file doesn't exist yet get fields info from gs.control and create DB 
+		- if file doesn't exist yet get fields info from gs.control and create DB
 		- else get fields info from gs.control and from db and check if datasets match -->
 			- set species list from db
 			- if datasets match, set the plantnames and then trigger levels of groups as recorded in the db
 		- set gs.db to reference to database instance
-	
+
 	- init of webgraph module -->
 		- set gs.webgraph to reference to webgraph instance
+
 	- init server -->
 		- setup network connection
 		- init network commands
 		- set gs.server to reference to server instance
+
 	- init buttons
 	- engage gpio expanders
 	- start control.powermanager thread

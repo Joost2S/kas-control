@@ -1,0 +1,350 @@
+{
+  "version": "0.08.00",
+  "date": "21-05-2018",
+  "sensorData": {
+    "light": {
+      "type": "light",
+      "sensors": [
+        {
+          "name": "ambientl",
+          "channel": 7
+        }
+      ]
+    },
+    "temp": {
+      "type": "temp",
+      "sensors": [
+        {
+          "name": "out_sun",
+          "address": "03168bf394ff"
+        },
+        {
+          "name": "out_shade",
+          "address": "000006d218ac"
+        },
+        {
+          "name": "ambientt",
+          "address": "000006d218ac"
+        },
+        {
+          "name": "psu",
+          "address": null
+        }
+      ]
+    },
+    "cputemp": {
+      "type": "cputemp",
+      "sensors": [
+        {
+          "name": "cpu"
+        }
+      ]
+    },
+    "flow": {
+      "type": "flow",
+      "sensors": [
+        {
+          "name": "totalw",
+          "pin": 14
+        }
+      ]
+    },
+    "groups": {
+      "groupdata": [
+        {
+          "name": "group1",
+          "enabled": true,
+          "valvepin": "1A3",
+          "mstSensor": {
+            "name": "soil-g1",
+            "ffPin1": "0A6",
+            "ffPin2": "0A7",
+            "ADCchannel": 0
+          },
+          "flowMeter": {
+            "name": "flow-g1",
+            "pin": 15
+          },
+          "tempSensor": {
+            "name": "temp-g1",
+            "address": null
+          }
+        },
+        {
+          "name": "group2",
+          "enabled": true,
+          "valvepin": "1A4",
+          "mstSensor": {
+            "name": "soil-g2",
+            "ffPin1": "0A4",
+            "ffPin2": "0A5",
+            "ADCchannel": 1
+          },
+          "flowMeter": {
+            "name": "flow-g2",
+            "pin": 17
+          },
+          "tempSensor": {
+            "name": "temp-g2",
+            "address": null
+          }
+        },
+        {
+          "name": "group3",
+          "enabled": true,
+          "valvepin": "1A5",
+          "mstSensor": {
+            "name": "soil-g3",
+            "ffPin1": "0A2",
+            "ffPin2": "0A3",
+            "ADCchannel": 2
+          },
+          "flowMeter": {
+            "name": "flow-g3",
+            "pin": 18
+          },
+          "tempSensor": {
+            "name": "temp-g3",
+            "address": null
+          }
+        },
+        {
+          "name": "group4",
+          "enabled": true,
+          "valvepin": "1A6",
+          "mstSensor": {
+            "name": "soil-g4",
+            "ffPin1": "0B1",
+            "ffPin2": "0B0",
+            "ADCchannel": 3
+          },
+          "flowMeter": {
+            "name": "flow-g4",
+            "pin": 27
+          },
+          "tempSensor": {
+            "name": "temp-g4",
+            "address": null
+          }
+        },
+        {
+          "name": "group5",
+          "enabled": true,
+          "valvepin": "1A7",
+          "mstSensor": {
+            "name": "soil-g5",
+            "ffPin1": "0B3",
+            "ffPin2": "0B2",
+            "ADCchannel": 4
+          },
+          "flowMeter": {
+            "name": "flow-g5",
+            "pin": "1B6"
+          },
+          "tempSensor": {
+            "name": "temp-g5",
+            "address": null
+          }
+        },
+        {
+          "name": "group6",
+          "enabled": true,
+          "valvepin": "1A1",
+          "mstSensor": {
+            "name": "soil-g6",
+            "ffPin1": "0B5",
+            "ffPin2": "0B4",
+            "ADCchannel": 5
+          },
+          "flowMeter": {
+            "name": "flow-g6",
+            "pin": "1B7"
+          },
+          "tempSensor": {
+            "name": "temp-g6",
+            "address": null
+          }
+        },
+        {
+          "name": "group7",
+          "enabled": false,
+          "valvepin": "1A3",
+          "mstSensor": {
+            "name": "soil-g7",
+            "ffPin1": "0B7",
+            "ffPin2": "0B6",
+            "ADCchannel": 6
+          },
+          "flowMeter": {
+            "name": "flow-g7",
+            "pin": null
+          },
+          "tempSensor": {
+            "name": "temp-g7",
+            "address": null
+          }
+        }
+      ]
+    }
+  },
+  "ina219": {
+    "type": "pwr",
+    "devices": [
+      {
+        "name": "5v",
+        "address": "0x40",
+        "voltage": 5,
+        "PGA": 2,
+        "BADC": 8,
+        "SADC": 8,
+        "mode": 7,
+        "maxCurrent": 4,
+        "rShunt": 0.040
+      }, {
+        "name": "12v",
+        "address": "0x45",
+        "voltage": 12,
+        "PGA": 2,
+        "BADC": 8,
+        "SADC": 8,
+        "mode": 7,
+        "maxCurrent": 4,
+        "rShunt": 0.040
+      }
+    ]
+  },
+  "lcd": {
+    "size": {
+      "rows": 2,
+      "cols": 16
+    },
+    "pins": [
+      {
+        "LCD_RS": 13,
+        "LCD_E": 19,
+        "LCD_L": 12,
+        "LCD4": 26,
+        "LCD5": 16,
+        "LCD6": 21,
+        "LCD7": 20
+      }
+    ],
+    "defaultSensors": [
+      {
+        "sensorName": "soil-g1",
+        "displayName": "sl-1"
+      },
+      {
+        "sensorName": "soil-g2",
+        "displayName": "sl-2"
+      },
+      {
+        "sensorName": "soil-g3",
+        "displayName": "sl-3"
+      },
+      {
+        "sensorName": "soil-g4",
+        "displayName": "sl-4"
+      },
+      {
+        "sensorName": "soil-g5",
+        "displayName": "sl-5"
+      },
+      {
+        "sensorName": "soil-g6",
+        "displayName": "sl-6"
+      },
+      {
+        "sensorName": "ambientt",
+        "displayName": "Tin"
+      },
+      {
+        "sensorName": "out_sun",
+        "displayName": "Tout"
+      },
+      {
+        "sensorName": "board",
+        "displayName": "brd"
+      },
+      {
+        "sensorName": "cpu",
+        "displayName": "CPU"
+      },
+      {
+        "sensorName": "5vc",
+        "displayName": "5vc"
+      },
+      {
+        "sensorName": "12vc",
+        "displayName": "12vc"
+      },
+      {
+        "sensorName": "totalw",
+        "displayName": "wtr"
+      }
+    ]
+  },
+  "ledbars": {
+    "type": "ledbar",
+    "bars": [
+      {
+        "name": "temps",
+        "Icount": 1,
+        "startAtEnd": "r",
+        "mode": "dot",
+        "pins": ["2A0", "2A1", "2A2", "2A3", "2A4", "2A5", "2A6", "3A4", "3A5", "3A6", "3A7", "1B0", "1B1", "1B2", "3B3", "3B2", "3B0", "3B1"],
+        "sensors": [
+          {
+            "name": "ambientt",
+            "min": 18,
+            "max": 27
+          },
+          {
+            "name": "out_shade",
+            "min": 18,
+            "max": 27
+          }
+        ]
+      },
+      {
+        "name": "mst",
+        "Icount": 3,
+        "startAtEnd": "r",
+        "mode": "dot",
+        "pins": ["2B7", "2B6", "2B5", "2B4", "2B3", "2B2", "2A7", "3A0", "3A1", "3A2", "3A3", "1B5", "1B4", "1B6", "3B7", "3B5", "3B4", "3B6"],
+        "sensors": [
+          {
+            "name": "soil-g1",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "soil-g2",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "soil-g3",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "soil-g4",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "soil-g5",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "soil-g6",
+            "min": null,
+            "max": null
+          }
+        ]
+      }
+    ]
+  }
+}

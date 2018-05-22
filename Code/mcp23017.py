@@ -1,14 +1,15 @@
 ﻿#!/usr/bin/python3
- 
+
 # Author: J. Saarloos
-# v0.10.0	04-03-2018
+# v0.10.1	19-05-2018
 
 """
 This is a python driver for an i2c MCP23017. python-smbus must be installed for this driver to work.
 You have to set up the pins you want to use and device settings first. Then run engage().
 After this you can use chip.
+Exclusivity: Setting up a pin as exclusive returns a UUID that needs te be sent along when turning pins on and off.
 For details about MCP23x17, see datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/20001952C.pdf
-Currently undergoing changes to add support for mcp23008.
+Currently undergoing changes to add support for mcp23008. Needs to be tested.
 For details about MCP23x08, see datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/21919e.pdf
 """
 
@@ -17,6 +18,7 @@ from abc import ABCMeta, abstractmethod
 from collections import Iterable
 import logging
 import smbus
+import uuid
 
 
 class Pin(object):
@@ -78,7 +80,7 @@ class Pin(object):
 	@pullUp.setter
 	def pullUp(self, pullUp):
 		self.__pullUp = pullUp
-	# state, to keep track of wether in output is on or off.
+	# state, to keep track of whether in output is on or off.
 	@property
 	def state(self):
 		return(self.__state)
@@ -96,10 +98,14 @@ class Pin(object):
 		self.intCon = False
 		self.pullUp = False
 		self.state = None
+		self.__uuid = None
 
-	def setDir(self, direction):
+	def setDir(self, direction, exclusive=False):
 		"""Set pin as input (True) or output (False)."""
 
+		if (self.__uuid is not None):
+			logging.warning("Attempt to assign new pin with exclusivty already claimed denied.")
+			return(False)
 		self.direction = direction
 		if (self.direction):
 			self.intEn = True
@@ -110,18 +116,30 @@ class Pin(object):
 			self.intCon = False
 			self.pullUp = False
 			self.state = False
+			if (exclusive):
+				self.__uuid = uuid.uuid4()
+		return(self.__uuid)
 
 	def setState(self, state):
 		if (not self.direction):
 			self.state = state
 
+	def validate(self, uid=None):
+		if (self.__uuid is None):
+			return(True)
+		elif (uid is None):
+			return(False)
+		if (self.__uuid == uid):
+			return(True)
+		return(False)
 
 	def showStatus(self):
 		return("name: " + str(self.name) + "\ndir: " + str(self.direction) + "\npol: " + str(self.polarity) + "\nintEn: " + str(self.intEn)
 			+ "\nintCon: " + str(self.intCon) + "\ndefval: " + str(self.defVal))
 
+
 class mcp230xx(object):
-	
+
 	# bus
 	@property
 	def bus(self):
@@ -181,14 +199,14 @@ class mcp230xx(object):
 		"MIRROR": True,
 		  "BANK": False
 	}
-	
+
 	trigger =  {"high" : (False, True, True),
 					"low" : (True, True, True),
 					"both" : (False, False, True)
 					}
-	
+
 	def __init__(self, devAddr, intPin = None):
-	
+
 		self.__metaclass__ = ABCMeta
 		self.devAddr = devAddr
 		self.bus = smbus.SMBus(1)	# 0 = /dev/i2c-0 (port I2C0), 1 = /dev/i2c-1 (port I2C1)
@@ -206,64 +224,64 @@ class mcp230xx(object):
 		# Populating banks with unset pins.
 		for i in range(8):
 			self.GPA.append(Pin(2 ** i, "B" + str(i)))
-			
+
 
 	@abstractmethod
 	def checkPinInput(self, input):
-		pass
-	
+			return(self.GPA, input)
+
 	@abstractmethod
 	def getInterruptPin(self):
 		pass
-	
+
 	@abstractmethod
 	def engage(self):
 		pass
-	
+
 	def setRegisters(self, bank, bankChar = ""):
-		
+
 		# GPIO DIRECTION input/output setup
 		ioDir = 0x00
 		for pin in bank:
 			if (pin.direction):
 				ioDir += pin.value
 		self.bus.write_byte_data(self.devAddr, self.regMap["IODIR" + bankChar], ioDir)
-		
+
 		# GPI POLARITY setup
 		IPOL = 0x00
 		for pin in bank:
 			if (pin.polarity):
 				IPOL += pin.value
 		self.bus.write_byte_data(self.devAddr, self.regMap["IPOL" + bankChar], IPOL)
-		
+
 		# GPINTEN interrupt enable setup
 		intEn = 0x00
 		for pin in bank:
 			if (pin.intEn):
 				intEn += pin.value
 		self.bus.write_byte_data(self.devAddr, self.regMap["GPINTEN" + bankChar], intEn)
-		
+
 		# Default compare value for interrupt-on-change, compare to high or low.
 		defVal = 0x00
 		for pin in bank:
 			if (pin.defVal):
 				defVal += pin.value
 		self.bus.write_byte_data(self.devAddr, self.regMap["DEFVAL" + bankChar], defVal)
-		
+
 		# Interrupt compare register, compare to DEFVAL or last pinstate.
 		intCon = 0x00
 		for pin in self.GPA:
 			if (pin.intCon):
 				intCon += pin.value
 		self.bus.write_byte_data(self.devAddr, self.regMap["INTCON" + bankChar], intCon)
-		
+
 		# GPI PULLUP resistor setup
 		GPPU = 0x00
 		for pin in self.GPA:
 			if (pin.pullUp):
 				GPPU += pin.value
 		self.bus.write_byte_data(self.devAddr, self.regMap["GPPU" + bankChar], GPPU)
-		
+
 		# General configuration
 		s = 2
 		value = 0x00
@@ -274,8 +292,9 @@ class mcp230xx(object):
 
 		return(value)
 
-	def setPin(self, pin, direction):
-		"""Call this method to setup a pin as input (direction = True) or output (direction = False)."""
+	def setPin(self, pin, direction, exclusive=False):
+		"""Call this method to setup a pin as input (direction = True) or output (direction = False).
+		Returns False if exclsivty is alreay claimed."""
 
 		if (not self.enabled):
 			try:
@@ -286,7 +305,9 @@ class mcp230xx(object):
 				self.hasAinput = True
 			elif (direction):
 				self.hasBinput = True
-			bank[pin].setDir(direction)
+			uid = bank[pin].setDir(direction, exclusive)
+			if (exclusive and not direction):
+				return(uid)
 		else:
 			logging.debug("MCP23017 device on {} is already enabled. Can't change pin {} anymore.".format(hex(self.devAddr), pin))
 
@@ -301,7 +322,7 @@ class mcp230xx(object):
 		else:
 			logging.debug("Cannot set register {}. Does not exist.".format(reg.upper()))
 
-	def output(self, pins, state):
+	def output(self, pins, state, uid=None):
 		"""Call this method to change one or more output pins to low (state = False) or high (state = True)."""
 
 		if (self.enabled):
@@ -314,6 +335,9 @@ class mcp230xx(object):
 					bank, pin = self.checkPinInput(p)
 				except PinValueError:
 					logging.debug("Output requested on invalid pin {}:{}".format(hex(self.devAddr), p))
+					continue
+				if (not bank[pin].validate(uid)):
+					logging.warning("Unauthorized access to pin {}:{} requested and denied.".format(hex(self.devAddr), p))
 					continue
 				if (bank == self.GPA):
 					AbankChanged = True
@@ -336,7 +360,7 @@ class mcp230xx(object):
 				self.bus.write_byte_data(self.devAddr, self.regMap["OLATB"], OLATb)
 		else:
 			logging.debug("MCP23017 on " + hex(self.devAddr) + " not enabled yet.")
-			
+
 	def __typeCheck(self, obj):
 		"""Returns True if iterable, False if str."""
 
@@ -353,12 +377,12 @@ class mcp230xx(object):
 				p.setState(False)
 		self.bus.write_byte_data(self.devAddr, self.regMap["OLATA"], 0x00)
 		self.bus.write_byte_data(self.devAddr, self.regMap["OLATB"], 0x00)
-		
+
 	def interruptSeperate(self, intPin):
 		"""This method should be called when 2 iterrupt pins are set."""
 
 		bank = 0
-		gp
+		gp = None
 		if (intPin == self.intPin):
 			gp = self.GPA
 			bank = int(self.bus.read_byte_data(self.devAddr, self.regMap["INTCAPA"]))
@@ -374,7 +398,7 @@ class mcp230xx(object):
 					return(p.name)
 		logging.debug("No pin found on interrupt. Addr: " + hex(self.devAddr) + " :(")
 		return("")
-	
+
 	def getPinStats(self, pin):
 		"""Call this method to get the most important settings of the given pin."""
 
@@ -383,10 +407,10 @@ class mcp230xx(object):
 			return(bank[pin].showStatus())
 		except PinValueError:
 			logging.debug("Stats requested for invalid pin {}:{}".format(hex(self.devAddr), pin))
-		
+
 	def getPinState(self, pin):
 		"""Call this method to see if a pin is high or low."""
-		
+
 		try:
 			bank, pin = self.checkPinInput(pin)
 		except PinValueError:
@@ -395,13 +419,13 @@ class mcp230xx(object):
 		if (bank == self.GPA):
 			register = "GPIOA"
 		bankValue = int(self.bus.read_byte_data(self.devAddr, self.regMap[register]))
-		if (not (self.GPA[checkedPin[1]].value & bankValue) == 0):
+		if (not (self.GPA[self.checkedPin[1]].value & bankValue) == 0):
 			return(True)
 		return(False)
 
 	def addInterruptInput(self, pin, obj, trig):
 		"""Add an object which has a run() method which will be called when interrupt pin is triggered."""
-		
+
 		if (not trig.lower() in self.trigger.keys()):
 			logging.debug("Invalid trigger type.")
 			return
@@ -445,10 +469,10 @@ class mcp230xx(object):
 #				logging.warning("Failed to run the run() method for the object for pin {}:{}".format(hex(self.devAddr), p))
 		else:
 			logging.warning("Pin {}:{} has no associated object.".format(hex(self.devAddr), p))
-			
+
 
 class mcp23008(mcp230xx):
-	
+
 	def __init__(self, devAddr, intPin = None):
 		super(mcp23008, self).__init__(devAddr, intPin)
 		self.regMap = {
@@ -458,7 +482,7 @@ class mcp23008(mcp230xx):
 					"IPOL":	0x01,
 					# Interupt-on-change enable
 					"GPINTEN" : 0x02,
-					# Default compare value for inputs. 
+					# Default compare value for inputs.
 					"DEFVAL" : 0x03,
 					# Interupt-on-change. False = compare to last pin value
 					"INTCON" : 0x04,
@@ -482,9 +506,9 @@ class mcp23008(mcp230xx):
 			print("Init MCP23017 (" + hex(self.devAddr) + ")...")
 			# Set device's registers and get value for last register.
 			value = self.setRegisters(self.GPA)
-			
+
 			self.bus.write_byte_data(self.devAddr, self.regMap["IOCON"], value)
-			
+
 			self.enabled = True
 			msg = "MCP23017 init on addres " + hex(self.devAddr) + " done!"
 			if (self.intPin is not None):
@@ -492,13 +516,13 @@ class mcp23008(mcp230xx):
 			print(msg)
 		else:
 			logging.debug("MCP23017 device on " + hex(self.devAddr) + " is already enabled. Can't change it anymore.")
-	
+
 	def checkPinInput(self, input):
 		"""
 		Returns the bank and pin number as int if the pin is valid.
 		Valid pin input values: 0-7
 		"""
-		
+
 		try:
 			input = int(input)
 		except ValueError:
@@ -508,10 +532,10 @@ class mcp23008(mcp230xx):
 			return(self.GPA, input)
 		logging.debug("Invalid pin: " + str(input))
 		raise PinValueError
-	
+
 	def getInterruptPin(self):
 		"""Interrupt routine should be called when the interrupt pin has been set."""
-		
+
 		if (self.hasAinput):
 			bank1 = int(self.bus.read_byte_data(self.devAddr, self.regMap["INTCAPA"]))
 			for p in self.GPA:
@@ -523,9 +547,8 @@ class mcp23008(mcp230xx):
 		return(None)
 
 
-
 class mcp23017(mcp230xx):
-		
+
 	# intPin2
 	@property
 	def intPin2(self):
@@ -540,9 +563,9 @@ class mcp23017(mcp230xx):
 	@GPB.setter
 	def GPB(self, GPB):
 		self.__GPB = GPB
-	
+
 	def __init__(self, devAddr, intPin = None, intPin2 = None):
-		
+
 		super(mcp23017, self).__init__(devAddr, intPin)
 		self.intPin2 = intPin2
 		self.hasBinput = False		#	True if there is at least one pin in the B bank set as an input.
@@ -565,7 +588,7 @@ class mcp23017(mcp230xx):
 					"IPOLA":	0X02,			"IPOLB":	0X03,
 					# Interupt-on-change enable
 				"GPINTENA": 0X04,		"GPINTENB": 0X05,
-					# Default compare value for inputs. 
+					# Default compare value for inputs.
 				 "DEFVALA":	0X06,		 "DEFVALB":	0X07,
 					# Interupt-on-change. False = compare to last pin value
 				 "INTCONA":	0X08,		 "INTCONB":	0X09,
@@ -580,21 +603,21 @@ class mcp23017(mcp230xx):
 					"OLATA":	0X14,			"OLATB":	0X15
 				}
 
-				
+
 	def engage(self):
 		"""\t\tCall this method after setting the pins and setting of the chip.
 		After enable, you can make no further changes and you can start using the chip."""
 
 		if (not self.enabled):
 			print("Init MCP23017 (" + hex(self.devAddr) + ")...")
-		
+
 			self.setRegisters(self.GPA, "A")
 			value = self.setRegisters(self.GPB, "B")
 
 
 			self.bus.write_byte_data(self.devAddr, self.regMap["IOCONA"], value)
 			self.bus.write_byte_data(self.devAddr, self.regMap["IOCONB"], value)
-			
+
 			self.enabled = True
 			msg = "MCP23017 init on addres " + hex(self.devAddr) + " done!"
 			if (self.intPin is not None):
@@ -604,7 +627,7 @@ class mcp23017(mcp230xx):
 			print(msg)
 		else:
 			logging.debug("MCP23017 on " + hex(self.devAddr) + " is already enabled. Can't change it anymore.")
-	
+
 	def checkPinInput(self, input):
 		"""
 		Returns the bank and pin number as int if the pin is valid.
@@ -625,13 +648,13 @@ class mcp23017(mcp230xx):
 				try:
 					pin = int(input[1])
 				except ValueError:
-					logging.debug("Invalid pin: " + str(input))	
+					logging.debug("Invalid pin: " + str(input))
 					raise PinValueError
 				if (0 <= pin <= 7):
 					return(bank, pin)
 		logging.debug("Invalid pin: " + str(input))
 		raise PinValueError
-	
+
 	def getInterruptPin(self):
 		"""Interrupt routine should be called when an interrupt pin has been set."""
 
@@ -653,6 +676,6 @@ class mcp23017(mcp230xx):
 			logging.debug("No pin found on interrupt at addr: " + hex(self.devAddr) + " :(")
 		return(None)
 
-	
+
 class PinValueError(Exception):
 	pass
