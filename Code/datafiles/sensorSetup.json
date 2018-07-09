@@ -1,6 +1,6 @@
 {
-  "version": "0.08.00",
-  "date": "21-05-2018",
+  "version": "0.08.02",
+  "date": "08-07-2018",
   "sensorData": {
     "light": {
       "type": "light",
@@ -54,7 +54,10 @@
         {
           "name": "group1",
           "enabled": true,
-          "valvepin": "1A3",
+          "valve": {
+            "pin": "1A3",
+            "power": 250
+          },
           "mstSensor": {
             "name": "soil-g1",
             "ffPin1": "0A6",
@@ -73,7 +76,10 @@
         {
           "name": "group2",
           "enabled": true,
-          "valvepin": "1A4",
+          "valve": {
+            "pin": "1A4",
+            "power": 250
+          },
           "mstSensor": {
             "name": "soil-g2",
             "ffPin1": "0A4",
@@ -92,7 +98,10 @@
         {
           "name": "group3",
           "enabled": true,
-          "valvepin": "1A5",
+          "valve": {
+            "pin": "1A5",
+            "power": 250
+          },
           "mstSensor": {
             "name": "soil-g3",
             "ffPin1": "0A2",
@@ -111,7 +120,10 @@
         {
           "name": "group4",
           "enabled": true,
-          "valvepin": "1A6",
+          "valve": {
+            "pin": "1A6",
+            "power": 250
+          },
           "mstSensor": {
             "name": "soil-g4",
             "ffPin1": "0B1",
@@ -130,7 +142,10 @@
         {
           "name": "group5",
           "enabled": true,
-          "valvepin": "1A7",
+          "valve": {
+            "pin": "1A7",
+            "power": 250
+          },
           "mstSensor": {
             "name": "soil-g5",
             "ffPin1": "0B3",
@@ -149,7 +164,10 @@
         {
           "name": "group6",
           "enabled": true,
-          "valvepin": "1A1",
+          "valve": {
+            "pin": "1A2",
+            "power": 250
+          },
           "mstSensor": {
             "name": "soil-g6",
             "ffPin1": "0B5",
@@ -168,7 +186,10 @@
         {
           "name": "group7",
           "enabled": false,
-          "valvepin": "1A3",
+          "valve": {
+            "pin": "1A1",
+            "power": 250
+          },
           "mstSensor": {
             "name": "soil-g7",
             "ffPin1": "0B7",
@@ -200,7 +221,8 @@
         "mode": 7,
         "maxCurrent": 4,
         "rShunt": 0.040
-      }, {
+      },
+      {
         "name": "12v",
         "address": "0x45",
         "voltage": 12,
@@ -301,8 +323,8 @@
           },
           {
             "name": "out_shade",
-            "min": 18,
-            "max": 27
+            "min": 10,
+            "max": 40
           }
         ]
       },

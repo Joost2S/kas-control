@@ -128,7 +128,7 @@ class floatUp(object):
 
 		return(GPIO.input(self.float_switch))
 
-	def lwstart(self, mail = False):
+	def lwstart(self, mail=False):
 		"""If low water level is detected, run this to disable pumping and send an email to user."""
 
 		if (GPIO.input(self.float_switch)):

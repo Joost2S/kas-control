@@ -21,9 +21,9 @@
 			- set lightchannel in adc
 			- set moistchannels in adc and add to groups
 			- init groups -->
-				- init associated valve
+				- init associated valve in powerManager
 		- init statusLED
-		- init pump
+		- init pump in powerManager
 		- init float switch
 		- init of 16x02/20x04 LCD
         - init of LEDbars

@@ -2284,11 +2284,11 @@ F 3 "" H 7900 5500 50  0001 C CNN
 	1    7900 5500
 	1    0    0    -1  
 $EndComp
-Text Label 7500 5500 0    60   ~ 0
+Text Label 7500 5600 0    60   ~ 0
 SDA
 Wire Wire Line
 	7350 5500 7700 5500
-Text Label 7500 5600 0    60   ~ 0
+Text Label 7500 5500 0    60   ~ 0
 CSL
 Wire Wire Line
 	7450 5600 7700 5600

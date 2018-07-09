@@ -1,7 +1,7 @@
 #!/usr/bin/python3
- 
+
 # Author: J. Saarloos
-# v0.6.07	16-03-2018
+# v0.6.08	09-07-2018
 
 import logging
 import threading
@@ -9,6 +9,7 @@ import time
 
 import globstuff
 from globstuff import globstuff as gs
+
 
 class Group(object):
 	"""This object represents the combination of a soil sensor and watervalve."""
@@ -19,19 +20,20 @@ class Group(object):
 	enabled = False
 	watering = None
 	below_range = None
-	__lowtrig = None
-	__hightrig = None
-	valve = None
+	lowtrig = None
+	hightrig = None
+	__valveUUID = None
 	__lock = None
 	flowName = None
 	tempName = None
 	plantName = ""
 
-	def __init__(self, gname, mname, tname, fname, valvepin):
+	def __init__(self, gname, mname, tname, fname, valve):
 
 		self.groupname = gname
 		self.mstName = mname
-		self.valve = Valve(valvepin)	# made an object
+		ID = gs.pwrmgr.setPowerDevice(valve["pin"], "valve", valve["power"])
+		self.__valveUUID = ID         # UUID for powerManager request
 		self.connected = False			# A sensor is considered disconnected when value <= adc resolution * 0.05.
 		self.watering = False
 		self.enabled = False				# Only enabled when a plant is present and triggers have been set.
@@ -49,7 +51,7 @@ class Group(object):
 		              "done watering",
 		              "disabled",
 		              "planted"]
-	
+
 
 	def getSensorData(self):
 
@@ -99,7 +101,7 @@ class Group(object):
 		if (not self.connected):
 			return("N/C")
 		return(self.flowName.getFlowRate())
-	
+
 	def removePlant(self):
 		"""When removing a plant, the channel will be disabled until a new plant is entered."""
 
@@ -120,7 +122,7 @@ class Group(object):
 			name = str(name).title()
 			gs.db.addPlant(name, self.groupname, type)
 			self.plantName = name
-			
+
 	def setTriggers(self, lt = None, ht = None):
 		"""If levels set below threshlod, container will be disabled."""
 
@@ -147,7 +149,7 @@ class Group(object):
 		data = gs.db.getContainerNameTriggers(self.groupname)
 		self.plantName = data[0]
 		self.setTriggers(data[1], data[2])
-		
+
 
 class WateringThread(globstuff.protoThread):
 	def run(self):
@@ -167,23 +169,24 @@ class Water(object):
 
 
 	def watering(self):
-		"""\tControls the actual watering. Watering is intermittent to allow the water to
-		drain a little to get a better measurement."""
-	
+		"""
+		Controls the actual watering. Watering is intermittent to
+		allow the water to drain a little to get a better measurement.
+		"""
+
 		self.group.watering = True
 		if (self.group.flowName is not None):
 			self.group.flowName.requestData(self)
 		start = round(time.time(), 2)
-		t = 1
 		while (gs.control.requestData(self.group.groupname, caller="wtr") < self.group.hightrig):
-			gs.control.requestPumping(self.group.groupname, t)
-			if (not self.group.connected or t == 3):
+			gs.pwrmgr.addRequest(self.group.valve, 12)
+			if (not self.group.connected):
 				break
 			for i in range(45):
 				time.sleep(1)
 				if ((not gs.running) or gs.testmode):
 					break
-		gs.control.requestPumping(self.group.groupname, t)
+		gs.pwrmgr.addRequest(self.group.valve, 4)
 		self.group.watering = False
 		end = round(time.time(), 2)
 		self.group.flowName.endRqeuest(self)
@@ -198,27 +201,3 @@ class Water(object):
 		""""""
 
 		self.flow += 1
-
-		
-class Valve(object):
-
-	power = 250		# mA
-	open = False
-	pin = ""
-
-	def __init__(self, pin):
-		
-		gs.getPinDev(pin).setPin(gs.getPinNr(pin))
-		gs.getPinDev(pin).output(gs.getPinNr(pin), False)
-		self.pin = pin
-
-
-	def on(self):
-
-		self.open = True
-		gs.getPinDev(self.pin).output(gs.getPinNr(self.pin), True)
-
-	def off(self):
-
-		self.open = False
-		gs.getPinDev(self.pin).output(gs.getPinNr(self.pin), False)

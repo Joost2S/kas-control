@@ -1,12 +1,12 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v1.1.09	01-04-2018
+# v1.1.10	16-06-2018
 
 """
-Template for making a new net command:
+Template for making a new network command:
 
-class cmd(netCommand):
+class cmd(NetCommand):
 
 	def __init__(self):
 		super(cmd, self).__init__()
@@ -14,13 +14,23 @@ class cmd(netCommand):
 		self.name = "Command"
 		self.args = ""
 		self.guiArgs = {}
-		self.help = ""
+		self.help = "\n"
 		self.help += ""
 
-	def runCommand(self, args = None):
+	def runCommand(self, client, args=None):
 		if (args is not None):
-			pass
-		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
+			# Gather relavnt data.
+			if (problem parsing):
+				return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
+			if (client == "GUI"):
+				# Parse data for a GUI client and return data.
+				return()
+			elif (client == "TERMINAL"):
+				# Parse data into text and return for TERMINAL client.
+				txt = ""
+				return(txt)
+			else:
+				return("Unsupported client type.")
 """
 
 from abc import ABCMeta, abstractmethod
@@ -81,7 +91,7 @@ class NetCommand(object):
 		super(NetCommand, self).__init__()
 
 	@abstractmethod
-	def runCommand(self, args = None):
+	def runCommand(self, client, args = None):
 		pass
 
 	def channelCheck(self, container):
@@ -963,6 +973,23 @@ class rmp(NetCommand):
 			return("Failed to remove plant from container {}. Check log for details.".format(chan))
 		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
 
+class rnp(NetCommand):
+
+	def __init__(self):
+		super(rnp, self).__init__()
+		self.command = "renameplant"
+		self.name = "Rename plant"
+		self.args = "%currentName\t%nemName"
+		self.guiArgs = {"Current name": "The name of the plant you want to change",
+		                "New name": "The name you want the plant to be changed to."}
+		self.help = "Alter the name of a plant.\n"
+		self.help += "Only allows current plants to be changed"
+
+	def runCommand(self, client, args = None):
+		if (args is not None):
+			pass
+		return("Please enter correctly formatted command. Enter 'help {}' for more information.".format(self.command))
+
 class cth(NetCommand):
 
 	def __init__(self):
@@ -991,9 +1018,11 @@ class sen(NetCommand):
 		self.args = None
 		self.help = "Returns a list with all sensors and some metadata per sensor.\n"
 
-	def runCommand(self, args = None):
+	def runCommand(self, client, args = None):
 
 		slist = gs.control.getDBcheckData()
+		if (client == "GUI"):
+			return(slist)
 		msg = ""
 		for item in ["|Name", "|Type", "|Group", "|Resolution"]:
 			msg += gs.getTabs(item)
@@ -1105,9 +1134,9 @@ class lbm(NetCommand):
 		self.name = "LEDbar mode"
 		self.args = "%mode%"
 		self.guiArgs = {None: "Returns the current configuration.",
-							"mode" : {"bar" : "LEDs 1 - current light up.",
+							"mode": {"bar" : "LEDs 1 - current light up.",
 							          "dot": "Only the current LED lights up.",
-							          "off" : "Turns the LEDbar off"}}
+							          "off": "Turns the LEDbar off"}}
 		self.help = "Change LEDbar mode to 'bar', 'dot' or 'off'.\n"
 		self.help += "If no argument is given, the current configuration is returned."
 
@@ -1219,7 +1248,7 @@ class Server(object):
 					spf(), flt(), pst(),
 					set(), get(), gra(),
 					log(), adp(), rmp(),
-					cth(), sen()]
+					rnp(), cth(), sen()]
 		if (gs.hwOptions["powermonitor"]):
 			comms.extend([led(), stl(),
 					pwr()])
@@ -1275,7 +1304,7 @@ class Server(object):
 
 				if (addr[0] != "127.0.0.1"):
 					try:
-						nt = client(gs.getThreadNr(), "client-" + str(self.clientNr), args = (conn, addr[0], str(addr[1])))
+						nt = Client(gs.getThreadNr(), "client-" + str(self.clientNr), args = (conn, addr[0], str(addr[1])))
 						nt.start()
 						gs.draadjes.append(nt)
 					except ConnectionResetError:
@@ -1369,7 +1398,7 @@ class Server(object):
 			return(0, ["Not a valid command. " + command])
 
 
-class client(globstuff.protoThread):
+class Client(globstuff.protoThread):
 	def run(self):
 		print("Starting thread{0}: {1}".format(self.threadID, self.name))
 		gs.server.clientthread(self.args[0], self.args[1], self.args[2])

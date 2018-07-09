@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.10.06	21-05-2018
+# v0.10.07	08-07-2018
 
 from collections import OrderedDict
 import json
@@ -263,8 +263,8 @@ class hwControl(object):
 		if (gs.hwOptions["powermonitor"]):
 			current = self.__ina["12v"].getCurrent()		# get current power draw from the PSU.
 		else:
-			if (gs.pwrmgr.addRequest("a", "t", "p", "pri")):
-				pass
+			# TODO: get ID, time, power, priority
+			return (gs.pwrmgr.addRequest("a", "t", "p", "pri"))
 		if (isinstance(cur[0], int)):
 			for c in cur:
 				current += c
@@ -437,7 +437,7 @@ class hwControl(object):
 				fname = fdev["name"]
 			# Creating group instance.
 			self.__groups[setup["name"]] = group.Group(data["name"], mname,
-										tname, fname, data["valvepin"])
+										tname, fname, data["valve"])
 
 	def __setINA219devs(self):
 		"""Set the registers of the INA219 devices and add voltage and current to sensors."""
@@ -449,9 +449,9 @@ class hwControl(object):
 			self.__ina[dev["name"]].setConfig(dev["PGA"], dev["BADC"], dev["SADC"], dev["mode"])
 			self.__ina[dev["name"]].setCalibration(dev["maxCurrent"], dev["rShunt"])
 			self.__ina[dev["name"]].engage()
-			self.__sensors[dev["name"] + "v"] = "pwr"
+			self.__sensors[dev["name"] + "v"] = data["ina219"]["type"]
 			self.__otherSensors.append(dev["name"] + "v")
-			self.__sensors[dev["name"] + "c"] = "pwr"
+			self.__sensors[dev["name"] + "c"] = data["ina219"]["type"]
 			self.__otherSensors.append(dev["name"] + "c")
 
 	def __setLCD(self):
@@ -463,6 +463,11 @@ class hwControl(object):
 		                               data["size"]["rows"], initial_backlight = 0)
 		self.LCD = lcdcontrol.lcdController(lcd)
 		self.LCD.setNames(data["defaultSensors"])
+		LCDmsg  = "   Welcome to   \n"
+		LCDmsg += "   Kas-Control  "
+		if (data["size"]["rows"] == 4):
+			LCDmsg = "\n  " + LCDmsg[:17] + "  " + LCDmsg[17:]
+		self.LCD.message(LCDmsg)
 
 	def __setLEDbars(self):
 		"""Sets the values and bounds for the LEDbars to display."""
@@ -555,12 +560,6 @@ class hwControl(object):
 		#	Indicate to user that the system is up and running.
 		if (gs.hwOptions["lcd"]):
 			self.LCD.toggleBacklight()
-			msg  = "   Welcome to   \n"
-			msg += "   Kas-Control  "
-			if (gs.LCD_SIZE[1] == 4):
-				msg = "\n" + msg
-			self.LCD.message(msg)
-			self.LCD.setNames(gs.defaultLCDsensors)
 		else:
 			self.__statusLED.blinkSlow(3)
 
@@ -800,8 +799,6 @@ class hwControl(object):
 				ina.reset()
 		if (gs.hwOptions["status LED"]):
 			self.__statusLED.disable()
-		for mcp in gs.mcplist:
-			mcp.allOff()
 
 
 class Monitor(globstuff.protoThread):

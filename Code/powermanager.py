@@ -1,24 +1,47 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.5.02	21-05-2018
+# v0.6.00	09-07-2018
 
 # TODO: dependencies. pump depends on at least one valve being active.
+# UUIDs:
+# pinID: used between manager and mcp driver.
+# objectID: used for exclusice acces for the first requester of a resource.
+# requestID: used in events (and thus publicly) and to get access to final report.
+# TODO: get access to reports of cancelled requests. Store in dict{requestID: report, ...}.
+
+"""
+Manages the usage of a power line that has a limited amount of power
+to ensure no more power is used than is available.
+Users must get an accesUUID by registering a power object on a GPIO pin.
+Multiple objects can be set on a single pin by sending along the first
+accessUUID on successive object registrations. Only one of these objects can
+have a request on it at one time.
+This ensures ownership. When making a request a requestUUID will be returned
+allowing the requesting process to get a report with info on how the
+request was handeled.
+accessUUID must be sent along when making a request.
+A report will be returned when manually ending a request.
+"""
 
 import logging
+import threading
 import time
 import uuid
 
 from globstuff import globstuff as gs
+
 
 class PowerManager(object):
 
 	__ina = None
 	__maxCurrent = 0
 	__requests = list()
-	__requestUUIDs = dict()   # {requestingUUID: pinUUID, ...}
+	__requestUUIDs = dict()    # {objectUUID: pinUUID, ...} !OBSOLETE!
+	__powerObjects = dict()    # {objectUUID: powerObject(), ...}
 	__stats = dict()
-	priorityLevel = {"critical": [0, 0],
+	__lock = None
+	__priorityLevel = {"critical": [0, 0],
 				        "emergency": [1, 10],
 				        "security": [11, 25],
 				        "user": [26, 50],
@@ -28,8 +51,9 @@ class PowerManager(object):
 
 	def __init__(self, ina=None):
 		super(PowerManager, self).__init__()
-		self.__maxCurrent = 10000
+		self.__maxCurrent = 4000
 		self.__ina = ina
+		self.__lock = threading.Lock()
 		gs.pwrmgr = self
 		gs.ee.on("cancelRequest", self.cancelRequest)
 		gs.ee.on("unPauseRequest", self.unPauseRequest)
@@ -56,54 +80,66 @@ class PowerManager(object):
 		self.__stats = data
 		gs.ee.emit("powerManagerStatsUpdated")
 
-	def pinSetup(self, pin):
+	def setPowerDevice(self, pin, devType, power, reqUUID=None):
 
-		pinuuid = gs.getPinDev(pin).setPin(gs.getPinNr(pin), False, True)
+		if (reqUUID is not None and reqUUID in self.__requestUUIDs.keys()):
+			pass
+		pinuuid = gs.getPinDev(pin).setPin(gs.getPinNr(pin), direction=False, exclusive=True)
 		if (pinuuid is False):
+			return(False)
+		if (not (0 < power <= self.__maxCurrent * 0.75)):
+			logging.warning("Power device with too high a current was requested and denied. {}: {}".format(devType, power))
 			return(False)
 		uid = uuid.uuid4()
 		self.__requestUUIDs[uid] = pinuuid
+		self.__powerObjects[uid] = PowerObject(pin, devType, power, pinuuid)
 		return(uid)
 
-	def addRequest(self, objectID, t, power, priority):
+	def addRequest(self, objectUUID, duration=None):
 		"""Request to use a device on the 12v line."""
 
-		# Check to see if the request meets all the requirements.
-		# objectID uniqueness:
-		for req in self.__requests:
-			if (req.objectID == objectID):
-				logging.debug("PowerRequest rejected. ObjectID already in use.")
+		with self.__lock:
+			# Check to see if the request meets all the requirements.
+			if (objectUUID not in self.__powerObjects.keys()):
+				logging.debug("PowerRequest rejected. Invalid UUID.")
 				return(False)
-		if (objectID not in self.__requestUUIDs.keys()):
-			logging.debug("PowerRequest rejected. Invalid UUID.")
-			return(False)
-		# time validity:
-		try:
-			t = int(t)
-		except ValueError:
-			logging.debug("PowerRequest rejected. Invalid time.")
-			return(False)
-		# power requirements:
-		try:
-			power = int(power)
-			if (not (0 < power <= self.__maxCurrent * 0.75)):
-				raise ValueError
-		except ValueError:
-			logging.debug("PowerRequest rejected. Invalid power requested.")
-			return(False)
-		# priority level:
-		try:
-			priority = int(priority)
-			if (not (0 <= priority <= 100)):
-				raise ValueError
-		except ValueError:
-			logging.debug("PowerRequest rejected. Invalid priority level.")
-			return(False)
-		r = Request(objectID, t, power, priority)
-		self.__requests.append(r)
-		self.__prioritySort()
-		self.__renewApprovalList()
-		return(True)
+			# duration validity:
+			if (duration is not None):
+				try:
+					duration = int(duration)
+				except ValueError:
+					logging.debug("PowerRequest rejected. Invalid time.")
+					return(False)
+			# objectID uniqueness:
+			for req in self.__requests:
+				if (req.objectID == objectUUID):
+					logging.debug("PowerRequest rejected. ObjectID already in use.")
+					return(False)
+			# Check dependancies:
+
+			# power requirements:
+			try:
+				power = int(power)
+				if (not (0 < power <= self.__maxCurrent * 0.75)):
+					raise ValueError
+			except ValueError:
+				logging.debug("PowerRequest rejected. Invalid power requested.")
+				return(False)
+			# priority level:
+			try:
+				priority = int(priority)
+				if (not (0 <= priority <= 100)):
+					raise ValueError
+			except ValueError:
+				logging.debug("PowerRequest rejected. Invalid priority level.")
+				return(False)
+			requestID = uuid.uuid4()
+			r = Request(requestID, objectID, duration, priority)
+			self.__requests.append(r)
+			self.__prioritySort()
+			self.__renewApprovalList()
+			# return new uuid for accessing report.
+			return(requestID)
 
 	def cancelRequest(self, objectID):
 
@@ -121,7 +157,7 @@ class PowerManager(object):
 						gs.ee.emit("removeFromActiveList", req.objectID)
 					return(report)
 		except KeyError:
-			pass
+			return(False)
 
 	def pauseRequest(self, objectID):
 
@@ -215,14 +251,23 @@ class PowerManager(object):
 		gs.ee.emit("removeFromQueueList", self.__requests[i].objectID)
 		gs.ee.emit("addToActiveList", self.__requests[i].data())
 
+	def disableDevice(self, objectUUID):
+
+		pass
+
+	def enableDevice(self, objectUUID):
+
+		pass
+
 
 class Request(object):
 
-	def __init__(self, objectID, t, power, priority):
+	def __init__(self, requestID, objectID, duration, priority):
+
+		if (duration is None):
+			duration = 0
 		self.objectID = objectID
-		self.power = power
-		self.timeDiff = t
-		self.requestedDuration = t
+		self.requestedDuration = duration
 		if (int(t) <= 0):
 			self.timeDiff = 0
 			self.timeLimited = False
@@ -268,6 +313,14 @@ class Request(object):
 		self.endTime = time.time()
 		self.cancelled = True
 
+	def assignDependant(self, obj):
+
+		pass
+
+	def unassignDependant(self, obj):
+
+		pass
+
 	def data(self):
 
 		data = dict()
@@ -295,3 +348,35 @@ class Request(object):
 		# report[""] =
 		# report[""] =
 		return(report)
+
+
+class PowerObject(object):
+
+	devType = ""
+	enabled = True
+	power = 0  # mA
+	on = False
+	pin = ""
+	pinuuid = None
+
+	def __init__(self, pin, devType, power, pinuuid):
+		self.pin = pin
+		self.devType = devType
+		self.power = power
+		self.pinuuid = pinuuid
+		self.prioritySpace = []
+
+	def turnOn(self):
+		self.on = True
+		gs.getPinDev(self.pin).output(gs.getPinNr(self.pin), True, uid=self.pinuuid)
+
+	def turnOff(self):
+		self.on = False
+		gs.getPinDev(self.pin).output(gs.getPinNr(self.pin), False, uid=self.pinuuid)
+
+	def disable(self):
+		self.enabled = False
+		self.turnOff()
+
+	def enable(self):
+		self.enabled = True
