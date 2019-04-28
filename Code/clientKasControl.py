@@ -1,35 +1,44 @@
 ﻿#!/usr/bin/python3
 
 # Author: J. Saarloos
-# v1.0	16-08-2017
+# v1.02.00	18-10-2018
 
 """
 Client for Kas control software.
 """
 
+import json
+import logging
 import os
+from pymitter import EventEmitter
 import socket
 import ssl
 import sys
 import webbrowser
-new = 2 # open in a new tab, if possible
+new = 2  # open in a new tab, if possible
+
+ee = EventEmitter()
 
 
-
-class shutdownError(Exception):
+class ShutdownError(Exception):
 	pass
 
-class kasControlClient(object):
+
+class ConnectionFailedError(Exception):
+	pass
+
+
+class KasControlClient(object):
 
 	host = "kas-control"
-	ipList = [("", "Login remote."),
-				("", "Login from remote location."),
-				("", "Login from home."),
-				("", "Login from test location.")
-				]
+	ipList = {"home-prod": "192.168.1.163",
+				"remote": "123.456.789.012",
+				"home-dev": "192.168.1.167"
+				}
 	ipAddr = ""
 	port = 7500
 	sslSocket = None
+	clientType = ""
 	dir = ""
 	htmlFile = ""
 	loop = True
@@ -45,6 +54,7 @@ class kasControlClient(object):
 		dir_path = os.path.dirname(os.path.realpath(__file__))
 		self.dir = dir_path.replace("\\", "/")
 		self.htmlFile = self.dir + "graph.html"
+		self.ipName = "home-prod"
 
 	def makeConnection(self):
 
@@ -55,80 +65,105 @@ class kasControlClient(object):
 			sys.exit()
 		print("Socket Created")
 
-		self.sslSocket = ssl.wrap_socket(s, ssl_version = ssl.PROTOCOL_TLSv1_2)
+		self.sslSocket = ssl.wrap_socket(s, ssl_version=ssl.PROTOCOL_TLSv1_2)
 		print("Socket secured")
 
-		try:
-			self.ipAddr = socket.gethostbyname(self.host)
-		except socket.gaierror:
-			# could not resolve
-			print("Hostname could not be resolved.")
+		# try:
+		# 	self.ipAddr = socket.gethostbyname(self.host)
+		# except socket.gaierror:
+		# 	# could not resolve
+		# 	print("Hostname could not be resolved.")
 
 		connected = False
-		for ip in self.ipList:
-			self.ipAddr = ip
-			for i in range(5):
-				try:
-					print("Trying... {}:{}".format(self.ipAddr[0], self.port))
-					self.sslSocket.connect((self.ipAddr[0], self.port))
-					connected = True
-					print(self.ipAddr[1])
-					break
-				except:
-					self.port += 1
+		self.ipAddr = self.ipList[self.ipName]
+		for i in range(1):
+			try:
+				print("Trying... {}:{}".format(self.ipAddr, self.port))
+				self.sslSocket.connect((self.ipAddr, self.port))
+				connected = True
+				break
+			except (ConnectionRefusedError, TimeoutError):
+				self.port += 1
 			if (connected):
 				break
-			else:
-				self.port -= 5
+		if (not connected):
+			self.port = 7500
+			ee.emit("ConnectionFailed")
+			raise ConnectionFailedError
 		print("Receiving...")
 		# Get welcome message
-		print(self.sslSocket.recv(256).decode())
+		print(self.sslSocket.recv(64).decode())
+		self.sslSocket.send(bytes(self.clientType, "utf-8"))
+		ack = self.sslSocket.recv(3).decode()
+		if (ack != "ACK"):
+			self.port = 7500
+			ee.emit("ConnectionRefused")
+			raise ConnectionRefusedError
+		ee.emit("ConnectionEstablished")
 
-	def client(self):
+	def command(self, args=None):
 
 		try:
-			while (True):
-				if (self.loop):
-					reply = input("Command: ")
+			if (args is not None):
+				command = args
+			elif (self.args is not None):
+				command = self.args
+			else:
+				return
+			if (self.clientType == "TERMINAL"):
+				if (command.strip() != ""):
+					cmd = str(command.split()[0]).lower()
 				else:
-					reply = self.args
-				if (not reply.strip() == ""):
-					rep = reply.split()
+					return("No command given.")
+			elif (self.clientType == "GUI"):
+				# print("command sent:", command)
+				if (isinstance(command, list)):
+					cmd = str(command[0]).lower()
+					command = json.dumps(command)
 				else:
-					print("No command given.")
-					continue
-				try:
-					self.sslSocket.sendall(bytes(reply, "utf-8"))
-				except ssl.SSLError:
-					# Send failed
-					print("Send failed")
-					continue
-				i, data = self.getData()
-				if (str(rep[0]).lower() == "graph"):
-					print(self.showgraph(data))
-				else:
-					print(data)
-				print(i)
-				if (str(rep[0]).lower() == "exit"):
-					raise shutdownError
-				if (not self.loop):
-					break
+					return("No command given.")
+			try:
+				self.sslSocket.sendall(bytes(command, "utf-8"))
+				print("Sent command:", command)
+			except ssl.SSLError:
+				return("Send failed")
+			i, data = self.getData()
+			if (cmd == "graph"):
+				return(self.showgraph(data))
+			elif (cmd == "exit"):
+				print("Exiting...")
+				raise ShutdownError
+			else:
+				return(data)
+		except ShutdownError:
+			if (self.clientType == "TERMINAL"):
+				raise ShutdownError
+			elif (self.clientType == "GUI"):
+				return ("Shutting down.")
 		except KeyboardInterrupt:
 			raise KeyboardInterrupt
+		# finally:
+		# 	print(data)
 
 	def getData(self):
 
 		data = ""
 		try:
-			i = int(self.sslSocket.recv(256).decode())
-			for j in range(i + 1):
+			i = int(self.sslSocket.recv(16).decode())
+			for j in range(i):
+				print("Receiving packet {} of {}.".format(j+1, i))
 				self.sslSocket.send(bytes("next", "utf-8"))
 				data += str(self.sslSocket.recv(8192).decode())
+			if (self.clientType == "GUI"):
+				data = json.loads(data)
+				# print("data:", data)
 		except ConnectionResetError:
 			print("Connection reset error.")
-			raise shutdownError
-		except:
-			print("Something happened.")
+			raise ShutdownError
+		except ValueError:
+			self.shutdown()
+			# todo: trigger event
+			return (0, data)
 		return(i, data)
 
 	def showgraph(self, data):
@@ -138,32 +173,58 @@ class kasControlClient(object):
 				print("writing to file")
 				text_file.write(bytes(data[:-6], "utf-8"))
 		except FileNotFoundError:
-#			logging.debug("File not found: " + self.htmlFile)
+			logging.debug("File not found: " + self.htmlFile)
 			return("File not found. Unable to make graph.")
 		except IOError:
-#			logging.debug("IO error trying to write to file: " + self.htmlFile)
+			logging.debug("IO error trying to write to file: " + self.htmlFile)
 			return("IO error. Unable to make graph.")
-		except:
-			return("Unknown error writing to file.")
 
-#		open browser to display file.
+		# open browser to display file.
 		url = "file://" + self.htmlFile
-		webbrowser.open(url, new = 2)
+		webbrowser.open(url, new=2)
 		return("Done.")
 
 	def shutdown(self):
 
 		print("Closing socket...")
 		self.sslSocket.close()
-		sys.exit()
 
-try:
-	client = kasControlClient()
-	client.makeConnection()
-	client.client()
-except KeyboardInterrupt:
-	print("Shutdown by keyboard.")
-except shutdownError:
-	print("Exiting client....")
-finally:
-	client.shutdown()
+
+def connect(cl):
+
+	while (True):
+		try:
+			cl.makeConnection()
+			return True
+		except ConnectionFailedError:
+			if (input("Failed to setup connection. Retry?: ") != "y"):
+				cl.shutdown()
+				return False
+		except ConnectionRefusedError:
+			cl.shutdown()
+			raise ShutdownError
+
+
+if (__name__ == "__main__"):
+
+	client = KasControlClient()
+	client.clientType = "TERMINAL"
+	try:
+		if (connect(client)):
+			while (True):
+				try:
+					comm = input("Command: ")
+					print(client.command(args=comm))
+					if (client.loop):
+						continue
+				except ShutdownError:
+					raise ShutdownError
+		else:
+			print("Shutting down.")
+	except KeyboardInterrupt:
+		print("Shutdown by keyboard.")
+	except ShutdownError:
+		print("Exiting client....")
+	finally:
+		client.shutdown()
+		sys.exit()

@@ -104,6 +104,6 @@ ENV/
 .mypy_cache/
 
 # PyCharm
-*.idea*
+.idea/*
 
 Code/counter.py
