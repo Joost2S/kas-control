@@ -1,13 +1,12 @@
 ﻿#!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.8.26	24-04-2019
+# v0.8.27	09-05-2019
 
 
 import json
 import logging
 import os
-import RPi.GPIO as GPIO
 import subprocess
 import sys
 import threading
@@ -15,8 +14,7 @@ import time
 
 from pymitter import EventEmitter
 
-from .drivers import  mcp23017
-from .drivers import  SPI_74LS138
+from Code.kascontrol.electronics.drivers import spi_74ls138
 
 
 class globstuff:
@@ -34,7 +32,10 @@ class globstuff:
 
 	# Locations of files.
 	dataloc = str(os.path.dirname(os.path.realpath(__file__))) + "/__datafiles/"
-	sensorSetup = dataloc + "sensorSetup.json"
+	setupFiles = {
+		"sensor": dataloc + "sensorSetup.json",
+		"hardware": dataloc + "hardwareSetup.json",
+	}
 	logfile = dataloc + "kascontrol.log"
 
 	# Misc GPIO pin assignments:
@@ -43,8 +44,6 @@ class globstuff:
 	pumpPin = "1A0"					# Pin for the pump.
 	sLEDpin = 23						# Status LED pin.
 	float_switch = 22					# Float switch pin, goes high if there is too little water in the storage tank.
-	intPinU4 = 5						# Interrupt pin for mcp23017 0x20, U4
-	intPinU5 = 25						# Interrupt pin for mcp23017 0x23, U5
 
 	powerLEDpins = ["43", "42", "41", "40"]
 
@@ -66,20 +65,20 @@ class globstuff:
 	running = True						# Set to False to start shutdown
 	shutdownOpt = None				# Set shutdown mode.
 
-	# Initiate MCP23017 GPIO expanders:
-	mcplist = [mcp23017.mcp23017(0x21),				# u2
-				mcp23017.mcp23017(0x20, intPinU4),	# u4
-				mcp23017.mcp23017(0x23, intPinU5),	# u5
-				mcp23017.mcp23017(0x27)					# u6
-				]
-	if (hwOptions["powermonitor"]):
-		mcplist.append(mcp23017.mcp23008(0x22))	# u12
-
 	# Major modules:
 	control = None						# Reference to the hwcontrol instance.
 	pwrmgr = None                 # Reference to the powerManager instance.
 	db = None							# Reference to database instance.
 	server = None						# Reference to the server object.
+
+	@staticmethod
+	def getSetupFile(file):
+		try:
+			with open(globstuff.setupFiles[file], "r") as f:
+				data = json.load(f)
+			return data
+		except KeyError:
+			return dict()
 
 	@staticmethod
 	def getPinNr(pin):
@@ -107,10 +106,9 @@ class globstuff:
 	@staticmethod
 	def __getSPIselect():
 
-		with open(globstuff.sensorSetup, "r") as f:
-			data = json.load(f)
+		data = globstuff.getSetupFile("hardware")
 		pins = data["74LS138"]["pins"]
-		return SPI_74LS138.SPI_74LS138(pins=pins)
+		return spi_74ls138.SPI_74LS138(pins=pins)
 
 	spi = __getSPIselect()
 
@@ -120,15 +118,6 @@ class globstuff:
 
 		m = ((data * 100) / float(globstuff.control.getADCres()))
 		return(str(round(m, places)))
-
-	@staticmethod
-	def getCPUtemp():
-		"""Retruns the current CPU temperature in degrees C"""
-
-		tempFile = open("/sys/class/thermal/thermal_zone0/temp")
-		cpu_temp = tempFile.read()
-		tempFile.close()
-		return(round(float(cpu_temp)/1000, 1))
 
 	@staticmethod
 	def getTabs(txt, tabs = 2, tablength = 8):
@@ -215,9 +204,10 @@ class globstuff:
 		print("Cleaning up and exiting Main Thread")
 		globstuff.server.sslSock.close()
 		globstuff.control.shutdown()
-		for mcp in globstuff.mcplist:
-			mcp.allOff()
-		GPIO.cleanup()
+		# TODO: move to hwcontrol shutdown
+		# for mcp in globstuff.mcplist:
+		# 	mcp.allOff()
+		# GPIO.cleanup()
 		print("Cleanup done.")
 		if (globstuff.shutdownOpt == "-r" or globstuff.shutdownOpt == "-x"):
 			if (globstuff.shutdownOpt == "-x"):

@@ -1,12 +1,10 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v1.0.00	27-04-2019
+# v1.0.01	10-05-2019
 
 
-import time
-
-from ...globstuff import globstuff as gs
+from Code.kascontrol.globstuff import globstuff as gs
 from .base.netCommand2 import NetCommand
 
 

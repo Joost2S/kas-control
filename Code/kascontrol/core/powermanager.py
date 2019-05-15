@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.6.00	09-07-2018
+# v0.6.01	10-05-2019
 
 # TODO: dependencies. pump depends on at least one valve being active.
 # UUIDs:
@@ -24,12 +24,13 @@ accessUUID must be sent along when making a request.
 A report will be returned when manually ending a request.
 """
 
+
 import logging
 import threading
 import time
 import uuid
 
-from ..globstuff import globstuff as gs
+from Code.kascontrol.globstuff import globstuff as gs
 
 
 class PowerManager(object):

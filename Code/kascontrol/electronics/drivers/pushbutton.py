@@ -8,7 +8,7 @@ import logging
 import RPi.GPIO as GPIO
 import time
 
-from ..globstuff import globstuff as gs
+from Code.kascontrol.globstuff import globstuff as gs
 
 
 class toggleButton(object):

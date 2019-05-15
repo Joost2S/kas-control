@@ -4,7 +4,7 @@
 # v0.1.02	20-05-2018
 
 
-from ..globstuff import globstuff as gs
+from Code.kascontrol.globstuff import globstuff as gs
 
 
 class LEDchannel(object):

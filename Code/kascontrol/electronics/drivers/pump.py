@@ -7,7 +7,7 @@
 import logging
 import time
 
-from ..globstuff import globstuff as gs
+from Code.kascontrol.globstuff import globstuff as gs
 
 
 class Pump(object):

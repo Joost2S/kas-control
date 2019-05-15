@@ -1,15 +1,15 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v1.0.00	24-04-2019
+# v1.0.01	10-05-2019
 
 
 import logging
 import socket
 import ssl
 
-from ...globstuff import globstuff as gs
-from ..network import ShutdownError
+from Code.kascontrol.globstuff import globstuff as gs
+from Code.kascontrol.core.network import ShutdownError
 from .base.netCommand import NetCommand
 
 

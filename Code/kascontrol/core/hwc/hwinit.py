@@ -1,27 +1,29 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.00	25-04-2019
+# v0.01.01	10-05-2019
 
 
 from abc import ABCMeta, abstractmethod
 import json
 import logging
+import smbus
 
-from ...core.group import Group
-from ...drivers.ds18b20 import tdevManager
-from ...drivers.fan import Fan
-from ...drivers.floatswitch import FloatSwitch
-from ...drivers.flowsensor import flowMeter
-from ...drivers.hd44780 import Adafruit_CharLCD
-from ...drivers.ina219 import INA219
-from ...drivers.lcdcontrol import lcdController
-from ...drivers.ledbar import LEDbar
-from ...drivers.mcp3x08 import MCP3208
-from ...drivers.powerLEDs import PowerLEDcontroller
-from ...drivers.pump import Pump
-from ...drivers.sigLED import sigLED
-from ...globstuff import globstuff as gs
+from Code.kascontrol.core.group import Group
+from Code.kascontrol.electronics.drivers.floatswitch import FloatSwitch
+from Code.kascontrol.electronics.drivers.hd44780 import Adafruit_CharLCD
+from Code.kascontrol.electronics.drivers.ina219 import INA219
+from Code.kascontrol.electronics.drivers.fan import Fan
+from Code.kascontrol.electronics.drivers.ledbar import LEDbar
+from Code.kascontrol.electronics.drivers.mcp3x08 import MCP3208
+from Code.kascontrol.electronics.drivers.powerLEDs import PowerLEDcontroller
+from Code.kascontrol.electronics.drivers.pump import Pump
+from Code.kascontrol.electronics.drivers.sigLED import sigLED
+from Code.kascontrol.electronics.managers.flowsensormanager import FlowSensorManager
+from Code.kascontrol.electronics.managers.gpiomanager import GPIOManager
+from Code.kascontrol.electronics.managers.lcdcontrol import lcdController
+from Code.kascontrol.electronics.managers.tdevmanager import TDevManager
+from Code.kascontrol.globstuff import globstuff as gs
 from .hwbase import HWbase
 
 
@@ -32,11 +34,14 @@ class HWinit(HWbase):
 	def __init__(self):
 		super(HWinit, self).__init__()
 
+		self.__i2cBus = smbus.SMBus(1)
+		self.__gpio = GPIOManager(self.__i2cBus)
 		self.__adc = MCP3208(spi=gs.spi, dev=0,
 		                             tLock=gs.spiLock,
-		                             gpio=gs.mcplist[0])
+		                             gpio=self.__gpio)
 		self.__connectedCheckValue = self.__adc.getResolution() * 0.05
-		self.__tempMGR = tdevManager()
+		self.__tempMGR = TDevManager()
+		self.__flowMGR = FlowSensorManager(self.__i2cBus)
 		self.__setINA219devs()
 		self.__setDataFromFile()
 		if (gs.hwOptions["powermonitor"]):
@@ -53,64 +58,55 @@ class HWinit(HWbase):
 			self.__plcontroller = PowerLEDcontroller()
 		if (gs.hwOptions["fan"]):
 			self.__fan = Fan(gs.fanPin)
+		self.__gpio.finalize()
 
 	def __setDataFromFile(self):
 		"""Sets all the sensors as defined in the sensors setup file."""
 
-		with open(gs.sensorSetup, "r") as f:
-			data = json.load(f)["sensorData"]
-		for sensorType, setup in data.items():
-			if (sensorType == "light"):
-				self.__setLightSensors(setup)
-			elif (sensorType == "temp"):
-				self.__setTempSensors(setup)
-			if (sensorType == "cputemp"):
-				self.__setLCPUtempSensors(setup)
-			if (sensorType == "flow"):
-				self.__setFlowSensors(setup)
-			if (sensorType == "groups"):
-				self.__setGroupSensors(setup)
+		data = gs.getSetupFile("sensor")["sensorData"]
+		for manager, sensors in data.items():
+			if (manager == "light"):
+				self.__setLightSensors(sensors)
+			elif (manager == "temp"):
+				self.__setTempSensors(sensors)
+			if (manager == "flow"):
+				self.__setFlowSensors(sensors)
+			if (manager == "groups"):
+				self.__setGroupSensors(sensors)
 
-	def __setLightSensors(self, setup):
+	def __setLightSensors(self, sensors):
 		""""""
 
-		for sensor in setup["sensors"]:
+		for sensor in sensors["sensors"]:
 			self.__adc.setChannel(sensor["name"], sensor["channel"])
-			self.__sensors[sensor["name"]] = setup["type"]
+			self.__sensors[sensor["name"]] = sensors["type"]
 			self.__otherSensors.append(sensor["name"])
 
-	def __setTempSensors(self, setup):
+	def __setTempSensors(self, sensors):
 		""""""
 
 		tempAddresses = self.__tempMGR.getTdevList()
-		for sensor in setup["sensors"]:
+		for sensor in sensors["sensors"]:
 			if (sensor["address"] in tempAddresses):
 				self.__tempMGR.setDev(sensor["name"], sensor["address"])
 			else:
 				logging.warning("Addres not available: " + sensor["address"])
-			self.__sensors[sensor["name"]] = setup["type"]
+			self.__sensors[sensor["name"]] = sensors["type"]
 			self.__otherSensors.append(sensor["name"])
 
-	def __setLCPUtempSensors(self, setup):
-		""""""
-
-		for sensor in setup["sensors"]:
-			self.__otherSensors.append(sensor["name"])
-			self.__sensors[sensor["name"]] = setup["type"]
-
-	def __setFlowSensors(self, setup):
+	def __setFlowSensors(self, sensors):
 		""""""
 
 		if (gs.hwOptions["flowsensors"]):
-			for sensor in setup["sensors"]:
-				self.__flowSensors[sensor["name"]] = flowMeter(sensor["pin"])
-				self.__sensors[sensor["name"]] = setup["type"]
+			for sensor in sensors["sensors"]:
+				self.__flowMGR.setChannel(sensor["name"], args=sensor["setup"])
+				self.__sensors[sensor["name"]] = sensors["type"]
 				self.__otherSensors.append(sensor["name"])
 
-	def __setGroupSensors(self, setup):
+	def __setGroupSensors(self, sensors):
 		""""""
 
-		for data in setup["groupdata"]:
+		for data in sensors:
 			if (not data["enabled"]):
 				continue
 			# Setting soil moisture level sensor:
@@ -134,20 +130,19 @@ class HWinit(HWbase):
 					logging.error("Temperature sensor {}, {} not found.".format(tdev["name"], tdev["address"]))
 			# Setting water flow meter sensor:
 			fdev = data["flowMeter"]
-			if (gs.hwOptions["flowSensors"] and fdev["pin"] is not None):
-				self.__sensors[fdev["name"]] = "flow"
-				self.__flowSensors[fdev["name"]] = flowMeter(fdev["pin"])
+			if (gs.hwOptions["flowSensors"]):
+				if self.__flowMGR.setChannel(fdev["name"], fdev["setup"]) is True:
+					self.__sensors[fdev["name"]] = "flow"
 				fname = fdev["name"]
 			# Creating group instance.
-			self.__groups[data["name"]] = Group(data["continaerNumber"],
-                                          data["name"], mname, tname,
-                                          fname, data["valve"])
+			self.__groups[data["name"]] = Group(data["containerNumber"],
+			                                    data["name"], mname, tname,
+			                                    fname, data["valve"])
 
 	def __setINA219devs(self):
 		"""Set the registers of the INA219 devices and add voltage and current to sensors."""
 
-		with open(gs.sensorSetup, "r") as f:
-			data = json.load(f)
+		data = gs.getSetupFile("hardware")
 		for dev in data["ina219"]["devices"]:
 			self.__ina[dev["name"]] = INA219(dev["address"], dev["voltage"])
 			self.__ina[dev["name"]].setConfig(dev["PGA"], dev["BADC"], dev["SADC"], dev["mode"])
@@ -160,8 +155,7 @@ class HWinit(HWbase):
 
 	def __setLCD(self):
 
-		with open(gs.sensorSetup, "r") as f:
-			data = json.load(f)["lcd"]
+		data = gs.getSetupFile("hardware")["lcd"]
 
 		lcd = Adafruit_CharLCD(data["pins"], data["size"]["cols"],
 		                               data["size"]["rows"], initial_backlight = 0)
@@ -176,8 +170,7 @@ class HWinit(HWbase):
 	def __setLEDbars(self):
 		"""Sets the values and bounds for the LEDbars to display."""
 
-		with open(gs.sensorSetup, "r") as f:
-			data = json.load(f)
+		data = gs.getSetupFile("hardware")
 		for bar in data["ledbars"]["bars"]:
 
 			self.__LEDbars[bar["name"]] = LEDbar(bar["pins"], bar["Icount"], bar["startAtEnd"])
@@ -186,8 +179,8 @@ class HWinit(HWbase):
 			# 	self.__LEDbars[bar[""]].setNames()
 
 	@abstractmethod
-	def requestData(self, stype = None, name = None, caller = None, perc = False):
-		return super().requestData(stype = stype, name = name, caller = caller, perc = perc)
+	def requestData(self, stype=None, name=None, formatted=None):
+		return super().requestData(stype=stype, name=name, formatted=formatted)
 
 	@abstractmethod
 	def requestPower(self, *cur):

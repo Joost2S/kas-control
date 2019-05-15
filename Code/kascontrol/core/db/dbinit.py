@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.1.00	25-04-2019
+# v0.1.01	10-05-2019
 
 
 from abc import ABCMeta#, abstractmethod
@@ -12,7 +12,7 @@ import threading
 
 from .base import BaseDBinterface
 from .base import DBValidationError
-from ...globstuff import globstuff as gs
+from Code.kascontrol.globstuff import globstuff as gs
 
 
 class DBinit(BaseDBinterface):

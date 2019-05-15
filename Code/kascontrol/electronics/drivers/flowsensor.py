@@ -1,55 +1,55 @@
 #! /usr/bin/python
  
 # Author: J. Saarloos
-# v0.06.51	25-04-2019
+# v0.06.52	15-05-2019
 
 import RPi.GPIO as GPIO
 import threading
 import time
 
 
-class flowMeter(object):
+class FlowMeter(object):
 	"""Object providing basic functionality for a water flow meter."""
 	
 	# pulses
 	@property
 	def pulses(self):
-		return(self.__pulses)
+		return self.__pulses
 	@pulses.setter
 	def pulses(self, pulses):
 		self.__pulses = pulses
 	# lock
 	@property
 	def lock(self):
-		return(self.__lock)
+		return self.__lock
 	@lock.setter
 	def lock(self, lock):
 		self.__lock = lock
 	# sendToObj
 	@property
 	def sendToObj(self):
-		return(self.__sendToObj)
+		return self.__sendToObj
 	@sendToObj.setter
 	def sendToObj(self, sendToObj):
 		self.__sendToObj = sendToObj
 	# flowcounter
 	@property
 	def flowcounter(self):
-		return(self.__flowcounter)
+		return self.__flowcounter
 	@flowcounter.setter
 	def flowcounter(self, flowcounter):
 		self.__flowcounter = flowcounter
 	# lastTime
 	@property
 	def lastTime(self):
-		return(self.__lastTime)
+		return self.__lastTime
 	@lastTime.setter
 	def lastTime(self, lastTime):
 		self.__lastTime = lastTime
 	# flowRate
 	@property
 	def flowRate(self):
-		return(self.__flowRate)
+		return self.__flowRate
 	@flowRate.setter
 	def flowRate(self, flowRate):
 		self.__flowRate = flowRate
@@ -64,9 +64,9 @@ class flowMeter(object):
 		self.flowRate = 0
 		if isinstance(pin, int):
 			GPIO.setup(pin, GPIO.IN)#, pull_up_down = GPIO.PUD_UP)
-			GPIO.add_event_detect(pin, GPIO.FALLING, callback = self.addPulse)
+			GPIO.add_event_detect(pin, GPIO.FALLING, callback=self.addPulse)
 		else:
-			from ..globstuff import globstuff as gs
+			from ...globstuff import globstuff as gs
 			gs.getPinDev(pin).setPin(gs.getPinNr(pin), True)
 			gs.getPinDev(pin).addInterruptInput(gs.getPinNr(pin), self, "high")
 
@@ -81,7 +81,7 @@ class flowMeter(object):
 	def endRqeuest(self, obj):
 		"""Object can unsubscribe to end it's measuring."""
 
-		if (obj in self.sendToObj):
+		if obj in self.sendToObj:
 			self.sendToObj.remove(obj)
 
 	def run(self):
@@ -100,7 +100,7 @@ class flowMeter(object):
 				self.endRqeuest(obj)
 				print("Failed to run addPulse() method of object: ", obj)
 		self.flowcounter += 1
-		if (self.flowcounter >= 5):
+		if self.flowcounter >= 5:
 			self.__setFlowRate(args[0])
 			self.flowcounter = 0
 
@@ -111,7 +111,7 @@ class flowMeter(object):
 			p = 0
 			p += self.pulses
 			self.pulses = 0
-		return(p)
+		return p
 
 	def __setFlowRate(self, pin):
 		"""Calculates the flowrate in pulses/min."""
@@ -124,7 +124,7 @@ class flowMeter(object):
 	def getFlowRate(self):
 		"""Returns the current flowRate and resets it if last pulse was > 5 seconds ago."""
 
-		if ((time.time() - self.lastTime) > 5):
+		if (time.time() - self.lastTime) > 5:
 			self.flowRate = 0
 			self.flowcounter = 0
-		return(self.flowRate)
+		return self.flowRate

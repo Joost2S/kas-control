@@ -5,7 +5,6 @@
 
 from abc import ABCMeta#, abstractmethod
 import logging
-import threading
 import time
 
 from ..globstuff import globstuff as gs

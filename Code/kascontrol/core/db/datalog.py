@@ -1,17 +1,17 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.00	25-04-2019
+# v0.01.01	10-05-2019
 
 
 from abc import ABCMeta#, abstractmethod
 import logging
 import time
 
-from ...globstuff import globstuff as gs
+from Code.kascontrol.globstuff import globstuff as gs
 from .base import BaseDBinterface
 from .base import DBValidationError
-from ...utils.protothread import ProtoThread
+from Code.kascontrol.utils.protothread import ProtoThread
 
 
 class Datalog(BaseDBinterface):

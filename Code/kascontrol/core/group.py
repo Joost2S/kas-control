@@ -15,8 +15,8 @@ from ..utils.protothread import ProtoThread
 class Group(object):
 	"""This object represents the combination of a soil sensor and watervalve."""
 
+	containerName = ""
 	containerNumber = int
-	groupname = ""
 	mstName = ""
 	flowName = None
 	tempName = None
@@ -30,9 +30,10 @@ class Group(object):
 	__valveUUID = None
 	__lock = None
 
-	def __init__(self, gname, mname, tname, fname, valve):
+	def __init__(self, cname, cnumber, mname, tname, fname, valve):
 
-		self.groupname = gname
+		self.containerName = cname
+		self.containerNumber = cnumber
 		self.plantName = None
 		self.mstName = mname
 		self.flowName = fname
@@ -69,23 +70,37 @@ class Group(object):
 		if (self.enabled):
 			return(self.plantName)
 		else:
-			return(self.groupname)
+			return(self.containerName)
+
+	def getStatus(self):
+		"""
+		Returns a named state if measurements are interrupted.
+		Returns True if
+		"""
+
+		if not self.connected:
+			return "N/C"
+		elif self.watering:
+			return "Busy"
+		elif not self.enabled:
+			return "NoPlant"
+		return True
 
 	def getM(self):
 		"""Returns the soil moisture level of the associated sensor."""
 
 		with self.__lock:
-			moist = gs.control.requestData(name = self.mstName)
+			mst = gs.control.requestData(name=self.mstName)
 			if (gs.running and not gs.testmode):
-				if (isinstance(moist, float)):
-					if (moist <= self.lowtrig and gs.control.isPumpEnabled()):
+				if (isinstance(mst, float)):
+					if (mst <= self.lowtrig and gs.control.isPumpEnabled()):
 						self.below_range += 1
 						if (self.below_range >= 5):
-							wt = WateringThread(gs.getThreadNr(), "watering" + str(self.groupname[-1]), obj=self)
+							wt = WateringThread(gs.getThreadNr(), "watering" + self.containerName, obj=self)
 							wt.start()
 							gs.wtrThreads.append(wt)
 							self.below_range = 0
-			return(moist)
+		return(mst)
 
 	def getT(self):
 		"""Returns the temperature of the associated sensor."""
@@ -115,7 +130,7 @@ class Group(object):
 			result = gs.db.removePlant(self.plantName)
 			self.plantName = None
 			return(result)
-		return("No plant currently assigned to container {}.".format(self.groupname[-1]))
+		return("No plant currently assigned to container {}.".format(self.containerNumber))
 
 	def addPlant(self, name, species=None):
 		"""\t\tAdd a plant. Only possible of no plant is currently assigned.
@@ -123,7 +138,7 @@ class Group(object):
 
 		if (not self.enabled and self.plantName is None):
 			name = str(name).title()
-			gs.db.addPlant(name, self.groupname, species)
+			gs.db.addPlant(name, self.containerName, species)
 			self.plantName = name
 
 	def setTriggers(self, lt=None, ht=None):
@@ -143,13 +158,13 @@ class Group(object):
 			# If both triggers are valid, re-enable the channel and write new value(s) to DB.
 			if (gs.control.connCheckValue() <= self.lowtrig < self.hightrig):
 				self.enabled = True
-				gs.db.setTriggers(self.groupname, self.lowtrig, self.hightrig)
+				gs.db.setTriggers(self.containerName, self.lowtrig, self.hightrig)
 			else:
 				self.enabled = False
 
 	def setFromDB(self):
 
-		data = gs.db.getContainerNameTriggers(self.groupname)
+		data = gs.db.getContainerNameTriggers(self.containerName)
 		self.containerNumber = data[0]
 		self.plantName = data[1]
 

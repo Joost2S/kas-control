@@ -1,13 +1,16 @@
 {
-  "version": "0.08.02",
-  "date": "08-07-2018",
+  "version": "0.09.00",
+  "date": "11-05-2019",
   "sensorData": {
     "light": {
       "type": "light",
       "sensors": [
         {
           "name": "ambientl",
-          "channel": 7
+          "setup": {
+            "channel": 7,
+            "type": "MCP3208"
+          }
         }
       ]
     },
@@ -16,27 +19,38 @@
       "sensors": [
         {
           "name": "out_sun",
-          "address": "03168bf394ff"
+          "setup": {
+            "address": "03168bf394ff",
+            "type": "ds18b20"
+          }
         },
         {
           "name": "out_shade",
-          "address": "000006d218ac"
+          "setup": {
+            "address": "000006d218ac",
+            "type": "ds18b20"
+          }
         },
         {
           "name": "ambientt",
-          "address": "000006d218ac"
+          "setup": {
+            "address": "000006d218ac",
+            "type": "ds18b20"
+          }
         },
         {
           "name": "psu",
-          "address": null
-        }
-      ]
-    },
-    "cputemp": {
-      "type": "cputemp",
-      "sensors": [
+          "setup": {
+            "address": null,
+            "type": "ds18b20"
+          }
+        },
         {
-          "name": "cpu"
+          "name": "CPU",
+          "setup": {
+            "address": null,
+            "type": "cpu"
+          }
         }
       ]
     },
@@ -45,200 +59,223 @@
       "sensors": [
         {
           "name": "totalw",
-          "pin": 14
+          "setup": {
+            "type": "direct",
+            "pin":  14
+          }
         }
       ]
     },
-    "groups": {
-      "groupdata": [
-        {
-          "name": "group1",
-          "number": 1,
-          "enabled": true,
-          "valve": {
-            "pin": "1A3",
-            "power": 250
-          },
-          "mstSensor": {
-            "name": "soil-g1",
-            "ffPin1": "0A6",
-            "ffPin2": "0A7",
-            "ADCchannel": 0
-          },
-          "flowMeter": {
-            "name": "flow-g1",
-            "pin": 15
-          },
-          "tempSensor": {
-            "name": "temp-g1",
-            "address": null
+    "groups": [
+      {
+        "name": "group1",
+        "containerNumber": 1,
+        "enabled": true,
+        "valve": {
+          "pin": "1A3",
+          "power": 250
+        },
+        "mstSensor":  {
+          "name": "soil-g1",
+          "setup": {
+            "ADCchannel": 1,
+            "type": "MCP3208"
           }
         },
-        {
-          "name": "group2",
-          "number": 2,
-          "enabled": true,
-          "valve": {
-            "pin": "1A4",
-            "power": 250
-          },
-          "mstSensor": {
-            "name": "soil-g2",
-            "ffPin1": "0A4",
-            "ffPin2": "0A5",
-            "ADCchannel": 1
-          },
-          "flowMeter": {
-            "name": "flow-g2",
-            "pin": 17
-          },
-          "tempSensor": {
-            "name": "temp-g2",
-            "address": null
+        "flowMeter":  {
+          "name": "flow-g1",
+          "setup": {
+            "type": "arduino",
+            "channel": 1
           }
         },
-        {
-          "name": "group3",
-          "number": 3,
-          "enabled": true,
-          "valve": {
-            "pin": "1A5",
-            "power": 250
-          },
-          "mstSensor": {
-            "name": "soil-g3",
-            "ffPin1": "0A2",
-            "ffPin2": "0A3",
-            "ADCchannel": 2
-          },
-          "flowMeter": {
-            "name": "flow-g3",
-            "pin": 18
-          },
-          "tempSensor": {
-            "name": "temp-g3",
-            "address": null
-          }
-        },
-        {
-          "name": "group4",
-          "number": 4,
-          "enabled": true,
-          "valve": {
-            "pin": "1A6",
-            "power": 250
-          },
-          "mstSensor": {
-            "name": "soil-g4",
-            "ffPin1": "0B1",
-            "ffPin2": "0B0",
-            "ADCchannel": 3
-          },
-          "flowMeter": {
-            "name": "flow-g4",
-            "pin": 27
-          },
-          "tempSensor": {
-            "name": "temp-g4",
-            "address": null
-          }
-        },
-        {
-          "name": "group5",
-          "number": 5,
-          "enabled": true,
-          "valve": {
-            "pin": "1A7",
-            "power": 250
-          },
-          "mstSensor": {
-            "name": "soil-g5",
-            "ffPin1": "0B3",
-            "ffPin2": "0B2",
-            "ADCchannel": 4
-          },
-          "flowMeter": {
-            "name": "flow-g5",
-            "pin": "1B6"
-          },
-          "tempSensor": {
-            "name": "temp-g5",
-            "address": null
-          }
-        },
-        {
-          "name": "group6",
-          "number": 6,
-          "enabled": true,
-          "valve": {
-            "pin": "1A2",
-            "power": 250
-          },
-          "mstSensor": {
-            "name": "soil-g6",
-            "ffPin1": "0B5",
-            "ffPin2": "0B4",
-            "ADCchannel": 5
-          },
-          "flowMeter": {
-            "name": "flow-g6",
-            "pin": "1B7"
-          },
-          "tempSensor": {
-            "name": "temp-g6",
-            "address": null
-          }
-        },
-        {
-          "name": "group7",
-          "number": 7,
-          "enabled": false,
-          "valve": {
-            "pin": "1A1",
-            "power": 250
-          },
-          "mstSensor": {
-            "name": "soil-g7",
-            "ffPin1": "0B7",
-            "ffPin2": "0B6",
-            "ADCchannel": 6
-          },
-          "flowMeter": {
-            "name": "flow-g7",
-            "pin": null
-          },
-          "tempSensor": {
-            "name": "temp-g7",
-            "address": null
+        "tempSensor": {
+          "name": "temp-g1",
+          "setup": {
+            "address": null,
+            "type": "ds18b20"
           }
         }
-      ]
-    }
-  },
-  "ina219": {
-    "type": "pwr",
-    "devices": [
-      {
-        "name": "5v",
-        "address": "0x40",
-        "voltage": 5,
-        "PGA": 2,
-        "BADC": 8,
-        "SADC": 8,
-        "mode": 7,
-        "maxCurrent": 4,
-        "rShunt": 0.040
       },
       {
-        "name": "12v",
-        "address": "0x45",
-        "voltage": 12,
-        "PGA": 2,
-        "BADC": 8,
-        "SADC": 8,
-        "mode": 7,
-        "maxCurrent": 4,
-        "rShunt": 0.040
+        "name": "group2",
+        "containerNumber": 2,
+        "enabled": true,
+        "valve": {
+          "pin": "1A4",
+          "power": 250
+        },
+        "mstSensor": {
+          "name": "soil-g2",
+          "setup": {
+            "ADCchannel": 2,
+            "type": "MCP3208"
+          }
+        },
+        "flowMeter": {
+          "name": "flow-g2",
+          "setup": {
+            "type": "arduino",
+            "channel": 2
+          }
+        },
+        "tempSensor": {
+          "name": "temp-g2",
+          "setup": {
+            "address": null,
+            "type": "ds18b20"
+          }
+        }
+      },
+      {
+        "name": "group3",
+        "containerNumber": 3,
+        "enabled": true,
+        "valve": {
+          "pin": "1A5",
+          "power": 250
+        },
+        "mstSensor": {
+          "name": "soil-g3",
+          "setup": {
+            "ADCchannel": 3,
+            "type": "MCP3208"
+          }
+        },
+        "flowMeter": {
+          "name": "flow-g3",
+          "setup": {
+            "type": "arduino",
+            "channel": 3
+          }
+        },
+        "tempSensor": {
+          "name": "temp-g3",
+          "setup": {
+            "address": null,
+            "type": "ds18b20"
+          }
+        }
+      },
+      {
+        "name": "group4",
+        "containerNumber": 4,
+        "enabled": true,
+        "valve": {
+          "pin": "1A6",
+          "power": 250
+        },
+        "mstSensor": {
+          "name": "soil-g4",
+          "setup": {
+            "ADCchannel": 4,
+            "type": "MCP3208"
+          }
+        },
+        "flowMeter": {
+          "name": "flow-g4",
+          "setup": {
+            "type": "arduino",
+            "channel": 4
+          }
+        },
+        "tempSensor": {
+          "name": "temp-g4",
+          "setup": {
+            "address": null,
+            "type": "ds18b20"
+          }
+        }
+      },
+      {
+        "name": "group5",
+        "containerNumber": 5,
+        "enabled": true,
+        "valve": {
+          "pin": "1A7",
+          "power": 250
+        },
+        "mstSensor": {
+          "name": "soil-g5",
+          "setup": {
+            "ADCchannel": 5,
+            "type": "MCP3208"
+          }
+        },
+        "flowMeter": {
+          "name": "flow-g5",
+          "setup": {
+            "type": "arduino",
+            "channel": 5
+          }
+        },
+        "tempSensor": {
+          "name": "temp-g5",
+          "setup": {
+            "address": null,
+            "type": "ds18b20"
+          }
+        }
+      },
+      {
+        "name": "group6",
+        "containerNumber": 6,
+        "enabled": true,
+        "valve": {
+          "pin": "1A2",
+          "power": 250
+        },
+        "mstSensor": {
+          "name": "soil-g6",
+          "setup": {
+            "ADCchannel": 6,
+            "type": "MCP3208"
+          }
+        },
+        "flowMeter": {
+          "name": "flow-g6",
+          "setup": {
+            "type": "arduino",
+            "channel": 6
+          }
+        },
+        "tempSensor": {
+          "name": "temp-g6",
+          "setup": {
+            "address": null,
+            "type": "ds18b20"
+          }
+        }
+      },
+      {
+        "name": "group7",
+        "containerNumber": 7,
+        "enabled": false,
+        "valve": {
+          "pin": "1A1",
+          "power": 250
+        },
+        "mstSensor": {
+          "name": "soil-g7",
+          "setup": {
+            "ADCchannel": 7,
+            "type": "MCP3208"
+          }
+        },
+        "flowMeter": {
+          "name": "flow-g7",
+          "setup": {
+            "type": "arduino",
+            "channel": 7
+          }
+        },
+        "tempSensor": {
+          "name": "temp-g7",
+          "setup": {
+            "address": null,
+            "type": "ds18b20"
+          }
+        }
       }
     ]
   },

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.1.00	25-04-2019
+# v0.1.01	09-05-2019
 
 
 from abc import ABCMeta, abstractmethod
@@ -9,7 +9,7 @@ import logging
 import sqlite3 as sql
 import sys
 
-from ...globstuff import globstuff as gs
+from Code.kascontrol.globstuff import globstuff as gs
 
 
 class BaseDBinterface(object):
@@ -110,10 +110,8 @@ class BaseDBinterface(object):
 		"""Takes a measurement of the value on the corresponding type and channel requested."""
 
 		for i in range(5):
-			data = gs.control.requestData(name = name.replace("_", "-"), caller = "db")
-			if (data is not False):
-				if (data is None):
-					return("null")
+			data = gs.control.requestData(name=name, formatted=False)
+			if (data is not False and data is not None):
 				return(data)
 		logging.warning("Failed to get a measurement for sensor {}.".format(name))
 		return("NULL")

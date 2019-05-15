@@ -1,16 +1,16 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.00	25-04-2019
+# v0.01.01	10-05-2019
 
 
 from abc import ABCMeta, abstractmethod
 import logging
 import time
 
-from ...globstuff import globstuff as gs
+from Code.kascontrol.globstuff import globstuff as gs
+from Code.kascontrol.utils.protothread import ProtoThread
 from .hwbase import HWbase
-from ...utils.protothread import ProtoThread
 
 
 class HWmonitor(HWbase):
@@ -128,57 +128,61 @@ class HWmonitor(HWbase):
 
 		try:
 			while (gs.running):
-				data = dict()
-
-				# Start collecting data.
-				data["time"] = time.strftime("%H:%M:%S")
-
-				# Get group data.
-				for g in self.__groups.values():
-					n = g.getName()
-					m, t, f = g.getSensorData()
-					data[g.groupname] = n
-					data[g.mstName] = m
-					if (gs.hwOptions["soiltemp"]):
-						data[g.tempName] = t
-					if (gs.hwOptions["flowsensors"]):
-						data[g.flowName] = f
-					if (not gs.running):
-						return
-
-				# Get data from other sensors.
-				for sname in self.__otherSensors:
-					data[sname] = self.requestData(name = sname)
-
-				# Outputting data to availabe outouts:
-				self.__rawStats = data
-				# if (gs.hwOptions["lcd"]):
-				# 	self.LCD.updateScreen()
-				# if (gs.hwOptions["ledbars"]):
-				# 	for bar in self.__LEDbars.values():
-				# 		bar.updateBar()
-
-				# Formatting data.
-				for name, value in data.items():
-					if (name == "time"):
-						continue
-					data[name] = gs.getTabs("|" + str(value), 1)
-				self.__currentstats = self.__template.format(**data)
-				print(self.__currentstats)
-
-				# Emitting event to alert devices of new data
-				gs.ee.emit("hwMonitorDataUpdate")
-
-				# Waiting for next interval of timeRes to start next itertion of loop.
-				if ((not gs.running) or gs.wait(self.__timeRes)):
-					return
-				# End of loop
-
+				self.__loop()
 		except KeyboardInterrupt:
 			pass
 		finally:
 			for t in gs.wtrThreads:
 				t.join()
+
+	def __loop(self):
+
+		data = dict()
+
+		# Start collecting data.
+		data["time"] = time.strftime("%H:%M:%S")
+
+		# Get group data.
+		for g in self.__groups.values():
+			n = g.getName()
+			m, t, f = g.getSensorData()
+			data[g.groupname] = n
+			data[g.mstName] = m
+			if (gs.hwOptions["soiltemp"]):
+				data[g.tempName] = t
+			if (gs.hwOptions["flowsensors"]):
+				data[g.flowName] = f
+			if (not gs.running):
+				return
+
+		# Get data from other sensors.
+		for sname in self.__otherSensors:
+			data[sname] = self.requestData(name=sname)
+			if sname.lower() == "psu":
+				self.__checkPSUtemp(data[sname])
+
+		# Outputting data to availabe outouts:
+		self.__rawStats = data
+		# if (gs.hwOptions["lcd"]):
+		# 	self.LCD.updateScreen()
+		# if (gs.hwOptions["ledbars"]):
+		# 	for bar in self.__LEDbars.values():
+		# 		bar.updateBar()
+
+		# Formatting data.
+		for name, value in data.items():
+			if (name == "time"):
+				continue
+			data[name] = gs.getTabs("|" + str(value), 1)
+		self.__currentstats = self.__template.format(**data)
+		print(self.__currentstats)
+
+		# Emitting event to alert devices of new data
+		gs.ee.emit("hwMonitorDataUpdate")
+
+		# Waiting for next interval of timeRes to start next itertion of loop.
+		if (not gs.running) or gs.wait(self.__timeRes):
+			return
 
 	def __checkConnected(self):
 		"""Checks and sets wether a sensor is connected to each channel of the ADC."""
@@ -193,9 +197,21 @@ class HWmonitor(HWbase):
 				else:
 					logging.debug("{} disabled".format(g.groupname))
 
+	def __checkPSUtemp(self, temp):
+
+		if (temp > self.__maxPSUtemp):
+			pass
+			#doEmergencyThing()
+		elif (temp > self.__fanToggleTemp):
+			if (not self.__fan.state()):
+				self.__fan.on()
+		elif (temp < (self.__fanToggleTemp - 15)):
+			if (self.__fan.state()):
+				self.__fan.off()
+
 	@abstractmethod
-	def requestData(self, stype = None, name = None, caller = None, perc = False):
-		return super().requestData(stype = stype, name = name, caller = caller, perc = perc)
+	def requestData(self, stype=None, name=None, formatted=None):
+		return super().requestData(stype=stype, name=name, formatted=formatted)
 
 	@abstractmethod
 	def requestPower(self, *cur):

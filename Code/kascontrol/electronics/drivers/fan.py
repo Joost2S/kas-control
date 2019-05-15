@@ -6,7 +6,7 @@
 
 import logging
 
-from ..globstuff import globstuff as gs
+from Code.kascontrol.globstuff import globstuff as gs
 
 
 class Fan(object):

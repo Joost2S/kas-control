@@ -10,8 +10,8 @@ import RPi.GPIO as GPIO
 import smtplib
 import time
 
-from ..globstuff import globstuff as gs
-from ..utils.protothread import ProtoThread
+from Code.kascontrol.globstuff import globstuff as gs
+from Code.kascontrol.utils.protothread import ProtoThread
 
 
 class FloatSwitch(object):
@@ -19,17 +19,17 @@ class FloatSwitch(object):
 
 	# low_water
 	@property
-	def low_water(self):
+	def lowWater(self):
 		return(self.__low_water)
-	@low_water.setter
-	def low_water(self, low_water):
+	@lowWater.setter
+	def lowWater(self, low_water):
 		self.__low_water = low_water
 	# float_switch
 	@property
-	def float_switch(self):
+	def pin(self):
 		return(self.__float_switch)
-	@float_switch.setter
-	def float_switch(self, float_switch):
+	@pin.setter
+	def pin(self, float_switch):
 		self.__float_switch = float_switch
 	# sLED
 	@property
@@ -46,14 +46,14 @@ class FloatSwitch(object):
 	def pump(self, pump):
 		self.__pump = pump
 
-	def __init__(self, float_switch, pump, sLED = None):
-		self.low_water = False
-		self.float_switch = float_switch
+	def __init__(self, pin, pump, sLED = None):
+		self.lowWater = False
+		self.pin = pin
 		self.sLED = sLED
 		self.pump = pump
 		self.lastMailSent = 0
-		GPIO.setup(self.float_switch, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-		GPIO.add_event_detect(self.float_switch, GPIO.RISING, callback=(self.lwstart), bouncetime=1000)
+		GPIO.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+		GPIO.add_event_detect(self.pin, GPIO.RISING, callback=(self.lwstart), bouncetime=1000)
 		if (self.getStatus()):
 			self.lwstart()
 
@@ -62,14 +62,14 @@ class FloatSwitch(object):
 		"""\t\tChecks and returns the current status of the float switch.
 		True if low water, False if enough water."""
 
-		return(GPIO.input(self.float_switch))
+		return(GPIO.input(self.pin))
 
 	def lwstart(self, mail=False):
 		"""If low water level is detected, run this to disable pumping and send an email to user."""
 
 		if (self.getStatus()):
-			self.low_water = True
-			logging.info("Low water status: " + str(self.low_water))
+			self.lowWater = True
+			logging.info("Low water status: " + str(self.lowWater))
 			self.pump.disable()
 
 			#	Start level checking and alarm LED.
@@ -105,10 +105,10 @@ class FloatSwitch(object):
 		"""\t\tRun as seperate thread when a low water level situation occurs.
 		Will self terminate when the water level is high enough again."""
 
-		while(self.low_water):
+		while(self.lowWater):
 			self.sLED.blinkFast(5)
 			if (not self.getStatus() or not gs.running):
-				self.low_water = False
+				self.lowWater = False
 
 
 class lowWater(ProtoThread):

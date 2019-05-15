@@ -1,12 +1,12 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.00	25-04-2019
+# v0.01.01	10-05-2019
 
 
 from abc import ABCMeta, abstractmethod
 
-from ...globstuff import globstuff as gs
+from Code.kascontrol.globstuff import globstuff as gs
 from .hwbase import HWbase
 
 
@@ -57,8 +57,8 @@ class PowerLEDinterface(HWbase):
 			return(self.__plcontroller.state(channel))
 
 	@abstractmethod
-	def requestData(self, stype = None, name = None, caller = None, perc = False):
-		return super().requestData(stype = stype, name = name, caller = caller, perc = perc)
+	def requestData(self, stype=None, name=None, formatted=None):
+		return super().requestData(stype=stype, name=name, formatted=formatted)
 
 	@abstractmethod
 	def requestPower(self, *cur):

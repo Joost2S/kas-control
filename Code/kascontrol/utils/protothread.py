@@ -52,4 +52,3 @@ class ProtoThread(threading.Thread):
 	@abstractmethod
 	def run(self):
 		pass
-

@@ -1,0 +1,123 @@
+{
+  "mcp23017": [
+    {
+      "number": 0,
+      "address": "0x21",
+      "board": "main",
+      "boardDesignation": "u2",
+      "interuptPin": null
+    },
+    {
+      "number": 1,
+      "address": "0x20",
+      "board": "main",
+      "boardDesignation": "u4",
+      "interuptPin": 5
+    },
+    {
+      "number": 2,
+      "address": "0x23",
+      "board": "main",
+      "boardDesignation": "u5",
+      "interuptPin": 25
+    },
+    {
+      "number": 3,
+      "address": "0x27",
+      "board": "main",
+      "boardDesignation": "u6",
+      "interuptPin": null
+    }
+  ],
+  "mcp23008": [
+    {
+      "number": 4,
+      "address": "0x22",
+      "board": "PSU",
+      "boardDesignation": "u12",
+      "interuptPin": null
+    }
+  ],
+  "mcp3208": [
+    {
+      "number": 0,
+      "spiSelect": 0,
+      "board": "main",
+      "boardDesignation": "u1",
+      "channels": {
+        "0": {
+          "flip-flop": null
+        },
+        "1": {
+          "flip-flop": {
+            "pin0": "0A0",
+            "pin1": "0A1"
+          }
+        },
+        "2": {
+          "flip-flop": {
+            "pin0": "0A2",
+            "pin1": "0A3"
+          }
+        },
+        "3": {
+          "flip-flop": {
+            "pin0": "0A4",
+            "pin1": "0A5"
+          }
+        },
+        "4": {
+          "flip-flop": {
+            "pin0": "0B0",
+            "pin1": "0B1"
+          }
+        },
+        "5": {
+          "flip-flop": {
+            "pin0": "0B2",
+            "pin1": "0B3"
+          }
+        },
+        "6": {
+          "flip-flop": {
+            "pin0": "0B4",
+            "pin1": "0B5"
+          }
+        },
+        "7": {
+          "flip-flop": {
+            "pin0": "0B6",
+            "pin1": "0B7"
+          }
+        }
+      }
+    }
+  ],
+  "ina219": {
+    "type": "pwr",
+    "devices": [
+      {
+        "name": "5v",
+        "address": "0x40",
+        "voltage": 5,
+        "PGA": 2,
+        "BADC": 8,
+        "SADC": 8,
+        "mode": 7,
+        "maxCurrent": 4,
+        "rShunt": 0.040
+      },
+      {
+        "name": "12v",
+        "address": "0x45",
+        "voltage": 12,
+        "PGA": 2,
+        "BADC": 8,
+        "SADC": 8,
+        "mode": 7,
+        "maxCurrent": 4,
+        "rShunt": 0.040
+      }
+    ]
+  }
+}

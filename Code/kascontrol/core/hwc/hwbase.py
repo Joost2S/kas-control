@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.00	25-04-2019
+# v0.01.01	10-05-2019
 
 
 from abc import ABCMeta, abstractmethod
@@ -19,8 +19,10 @@ class HWbase(object):
 	__fan = None				# Reference to fan object.
 	__fanToggleTemp = 45		# Temoerature at which to turn on fan.
 	__floatSwitch = None		# Reference to floatSwitch object
-	__flowSensors = {}		# List of all flowsensors. {name : flowMeter object}
+	__flowMGR = None			# Waterflow sensor manager. Direct all queries for flowsensors of any type here.
+	__gpio = None           # GPIO manager
 	__groups = {}				# Dict with group instances. {name : group}
+	__i2cBus = None
 	__ina = {}					# Powermonitors. {name : ina219 object}
 	__plcontroller = None	# Reference to powerLED controller
 	__pump = None				# Reference to pump object.
@@ -49,7 +51,7 @@ class HWbase(object):
 		return(self.__adc.getResolution())
 
 	@abstractmethod
-	def requestData(self, stype = None, name = None, caller = None, perc = False):
+	def requestData(self, stype=None, name=None, formatted=None):
 		pass
 
 	@abstractmethod

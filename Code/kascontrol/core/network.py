@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v1.2.00	24-04-2019
+# v1.2.01	10-05-2019
 
 
 # TODO: import hashlib
@@ -10,8 +10,8 @@ import logging
 import socket
 import ssl
 
-from ..globstuff import globstuff as gs
-from ..utils.protothread import ProtoThread
+from Code.kascontrol.globstuff import globstuff as gs
+from Code.kascontrol.utils.protothread import ProtoThread
 from .commands.Adp import Adp
 from .commands.Cth import Cth
 from .commands.Cur import Cur

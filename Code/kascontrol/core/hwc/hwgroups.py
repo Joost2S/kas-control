@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.00	27-04-2019
+# v0.01.01	10-05-2019
 
 
 from abc import ABCMeta, abstractmethod
@@ -113,8 +113,8 @@ class HWgroups(HWbase):
 		return(len(self.__groups))
 
 	@abstractmethod
-	def requestData(self, stype = None, name = None, caller = None, perc = False):
-		return super().requestData(stype = stype, name = name, caller = caller, perc = perc)
+	def requestData(self, stype=None, name=None, formatted=None):
+		return super().requestData(stype=stype, name=name, formatted=formatted)
 
 	@abstractmethod
 	def requestPower(self, *cur):

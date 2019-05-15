@@ -1,7 +1,7 @@
 #!/usr/bin/python3
  
 # Author: J. Saarloos
-# v0.3.00	09-03-2018
+# v0.3.01	09-05-2019
 
 # For details, see datasheet: http://www.ti.com/lit/ds/symlink/ina219.pdf
 
@@ -35,10 +35,13 @@ class INA219(object):
 			"Bus voltage, continuous",
 			"Shunt and bus, continuous"]
 
-	def __init__(self, addr, lineV):
+	def __init__(self, addr, lineV, bus=None):
 		
 		self.__addr = addr
-		self.__bus = smbus.SMBus(1)
+		if bus is None:
+			self.__bus = smbus.SMBus(1)
+		else:
+			self.__bus = bus
 		if (-26 <= lineV <= 26):
 			self.__lineV = lineV
 		else:

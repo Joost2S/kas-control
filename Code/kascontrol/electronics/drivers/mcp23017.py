@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.10.1	19-05-2018
+# v0.10.03	12-05-2019
 
 """
 This is a python driver for an i2c MCP23017. python-smbus must be installed for this driver to work.
@@ -205,11 +205,14 @@ class mcp230xx(object):
 					"both" : (False, False, True)
 					}
 
-	def __init__(self, devAddr, intPin = None):
+	def __init__(self, devAddr, intPin=None, bus=None):
 
 		self.__metaclass__ = ABCMeta
 		self.devAddr = devAddr
-		self.bus = smbus.SMBus(1)	# 0 = /dev/i2c-0 (port I2C0), 1 = /dev/i2c-1 (port I2C1)
+		if bus is None:
+			self.bus = smbus.SMBus(1)	# 0 = /dev/i2c-0 (port I2C0), 1 = /dev/i2c-1 (port I2C1)
+		else:
+			self.bus = bus
 		self.intPin = intPin
 		self.hasAinput = False		#	True if there is at least one pin in the A bank set as an input.
 		self.enabled = False
@@ -218,8 +221,8 @@ class mcp230xx(object):
 		# Setting interrupt pin on the Raspberry Pi.
 		if (self.intPin is not None):
 			import RPi.GPIO as GPIO
-			GPIO.setup(self.intPin, GPIO.IN, pull_up_down = GPIO.PUD_UP)
-			GPIO.add_event_detect(self.intPin, GPIO.FALLING, callback = self.runInterrupt)
+			GPIO.setup(self.intPin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+			GPIO.add_event_detect(self.intPin, GPIO.FALLING, callback=self.runInterrupt)
 			logging.info("Set interrupt on {} with GPIO pin {}".format(hex(self.devAddr), self.intPin))
 		# Populating banks with unset pins.
 		for i in range(8):
@@ -238,7 +241,7 @@ class mcp230xx(object):
 	def engage(self):
 		pass
 
-	def setRegisters(self, bank, bankChar = ""):
+	def setRegisters(self, bank, bankChar=""):
 
 		# GPIO DIRECTION input/output setup
 		ioDir = 0x00
@@ -294,7 +297,7 @@ class mcp230xx(object):
 
 	def setPin(self, pin, direction, exclusive=False):
 		"""Call this method to setup a pin as input (direction = True) or output (direction = False).
-		Returns False if exclsivty is alreay claimed."""
+		Returns False if exclsivity is alreay claimed."""
 
 		if (not self.enabled):
 			try:
@@ -418,12 +421,12 @@ class mcp230xx(object):
 			logging.debug("State requested for invalid pin {}:{}".format(hex(self.devAddr), pin))
 			return
 		register = "GPIOB"
-		if (bank == self.GPA):
+		if bank == self.GPA:
 			register = "GPIOA"
 		bankValue = int(self.bus.read_byte_data(self.devAddr, self.regMap[register]))
-		if (not (self.GPA[self.checkedPin[1]].value & bankValue) == 0):
-			return(True)
-		return(False)
+		if not (self.GPA[self.checkedPin[1]].value & bankValue) == 0:
+			return True
+		return False
 
 	def addInterruptInput(self, pin, obj, trig):
 		"""Add an object which has a run() method which will be called when interrupt pin is triggered."""
@@ -475,8 +478,8 @@ class mcp230xx(object):
 
 class mcp23008(mcp230xx):
 
-	def __init__(self, devAddr, intPin = None):
-		super(mcp23008, self).__init__(devAddr, intPin)
+	def __init__(self, devAddr, intPin=None, bus=None):
+		super(mcp23008, self).__init__(devAddr, intPin, bus)
 		self.regMap = {
 					# Direction
 					"IODIR" : 0x00,
@@ -566,9 +569,9 @@ class mcp23017(mcp230xx):
 	def GPB(self, GPB):
 		self.__GPB = GPB
 
-	def __init__(self, devAddr, intPin = None, intPin2 = None):
+	def __init__(self, devAddr, intPin=None, intPin2=None, bus=None):
 
-		super(mcp23017, self).__init__(devAddr, intPin)
+		super(mcp23017, self).__init__(devAddr, intPin, bus)
 		self.intPin2 = intPin2
 		self.hasBinput = False		#	True if there is at least one pin in the B bank set as an input.
 		if (self.intPin is not None and intPin2 is not None):

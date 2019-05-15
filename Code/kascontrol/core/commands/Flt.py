@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v1.0.00	24-04-2019
+# v1.0.01	10-05-2019
 
 
-from ...globstuff import globstuff as gs
+from Code.kascontrol.globstuff import globstuff as gs
 from .base.netCommand import NetCommand
 
 
@@ -20,6 +20,6 @@ class Flt(NetCommand):
 	def runCommand(self, client, args = None):
 
 		if (client == "GUI"):
-			return(gs.fltdev.low_water)
+			return(gs.fltdev.lowWater)
 		if (client == "TERMINAL"):
-			return("fltdev pinstate: " + str(gs.fltdev.getStatus()) + " low_water state: " + str(gs.fltdev.low_water))
+			return("fltdev pinstate: " + str(gs.fltdev.getStatus()) + " low_water state: " + str(gs.fltdev.lowWater))
