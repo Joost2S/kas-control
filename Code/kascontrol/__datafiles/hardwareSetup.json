@@ -1,4 +1,15 @@
 {
+  "options": {
+    "lcd" : true,
+    "buttons" : true,
+    "ledbars" : true,
+    "flowsensors" : true,
+    "floatswitch" : true,
+    "soiltemp" : true,
+    "powermonitor" : true,
+    "status LED" : true,
+    "fan" : true
+  },
   "mcp23017": [
     {
       "number": 0,
@@ -38,61 +49,63 @@
       "interuptPin": null
     }
   ],
-  "mcp3208": [
-    {
-      "number": 0,
-      "spiSelect": 0,
-      "board": "main",
-      "boardDesignation": "u1",
-      "channels": {
-        "0": {
-          "flip-flop": null
-        },
-        "1": {
-          "flip-flop": {
-            "pin0": "0A0",
-            "pin1": "0A1"
-          }
-        },
-        "2": {
-          "flip-flop": {
-            "pin0": "0A2",
-            "pin1": "0A3"
-          }
-        },
-        "3": {
-          "flip-flop": {
-            "pin0": "0A4",
-            "pin1": "0A5"
-          }
-        },
-        "4": {
-          "flip-flop": {
-            "pin0": "0B0",
-            "pin1": "0B1"
-          }
-        },
-        "5": {
-          "flip-flop": {
-            "pin0": "0B2",
-            "pin1": "0B3"
-          }
-        },
-        "6": {
-          "flip-flop": {
-            "pin0": "0B4",
-            "pin1": "0B5"
-          }
-        },
-        "7": {
-          "flip-flop": {
-            "pin0": "0B6",
-            "pin1": "0B7"
+  "adc": {
+    "mcp3208": [
+      {
+        "number": 0,
+        "spiChannel": 0,
+        "board": "main",
+        "boardDesignation": "u1",
+        "channels": {
+          "0": {
+            "flip-flop": null
+          },
+          "1": {
+            "flip-flop": {
+              "pin0": "0A0",
+              "pin1": "0A1"
+            }
+          },
+          "2": {
+            "flip-flop": {
+              "pin0": "0A2",
+              "pin1": "0A3"
+            }
+          },
+          "3": {
+            "flip-flop": {
+              "pin0": "0A4",
+              "pin1": "0A5"
+            }
+          },
+          "4": {
+            "flip-flop": {
+              "pin0": "0B0",
+              "pin1": "0B1"
+            }
+          },
+          "5": {
+            "flip-flop": {
+              "pin0": "0B2",
+              "pin1": "0B3"
+            }
+          },
+          "6": {
+            "flip-flop": {
+              "pin0": "0B4",
+              "pin1": "0B5"
+            }
+          },
+          "7": {
+            "flip-flop": {
+              "pin0": "0B6",
+              "pin1": "0B7"
+            }
           }
         }
       }
-    }
-  ],
+    ]
+  },
   "ina219": {
     "type": "pwr",
     "devices": [

@@ -1,12 +1,11 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.00	25-04-2019
+# v0.01.01	17-05-2019
 
 
 import datetime
 import logging
-import RPi.GPIO as GPIO
 import smtplib
 import time
 
@@ -46,14 +45,23 @@ class FloatSwitch(object):
 	def pump(self, pump):
 		self.__pump = pump
 
-	def __init__(self, pin, pump, sLED = None):
+	def __init__(self, pin, pump, gpio, sLED = None):
+		super(FloatSwitch, self).__init__()
+
+		self.gpio = gpio
 		self.lowWater = False
-		self.pin = pin
 		self.sLED = sLED
 		self.pump = pump
 		self.lastMailSent = 0
-		GPIO.setup(self.pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-		GPIO.add_event_detect(self.pin, GPIO.RISING, callback=(self.lwstart), bouncetime=1000)
+		self.pin = self.gpio.setPin(
+			pin=pin,
+			state=True,
+			devAddr=pin["addr"],
+			args=pin["args"])
+		self.gpio.addInterrupt(pin=self.pin,
+		                       edge="rising",
+		                       callback=self.lwstart,
+		                       args={"bouncetime": 1000})
 		if (self.getStatus()):
 			self.lwstart()
 
@@ -62,7 +70,7 @@ class FloatSwitch(object):
 		"""\t\tChecks and returns the current status of the float switch.
 		True if low water, False if enough water."""
 
-		return(GPIO.input(self.pin))
+		return(self.gpio.input(self.pin))
 
 	def lwstart(self, mail=False):
 		"""If low water level is detected, run this to disable pumping and send an email to user."""

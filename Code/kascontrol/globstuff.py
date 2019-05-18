@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.8.27	09-05-2019
+# v0.8.28	17-05-2019
 
 
 import json
@@ -19,16 +19,7 @@ from Code.kascontrol.electronics.drivers import spi_74ls138
 
 class globstuff:
 
-	hwOptions = {"lcd" : True,
-				  "buttons" : True,
-				  "ledbars" : True,
-				  "flowsensors" : True,
-				  "floatswitch" : True,
-				  "soiltemp" : True,
-				  "powermonitor" : True,
-				  "status LED" : True,
-				  "fan" : True,
-				  }
+	hwOptions = None
 
 	# Locations of files.
 	dataloc = str(os.path.dirname(os.path.realpath(__file__))) + "/__datafiles/"
@@ -79,22 +70,6 @@ class globstuff:
 			return data
 		except KeyError:
 			return dict()
-
-	@staticmethod
-	def getPinNr(pin):
-		"""Returns the pin number without device number."""
-
-		return(str(pin[1:]))
-
-	@staticmethod
-	def getPinDev(pin):
-		"""Returns the mpc23017 device for the corresponding pin."""
-
-		try:
-			return(globstuff.mcplist[int(pin[0])])
-		except ValueError:
-			logging.error("Invalid MCP23017 instance: " + str(pin))
-			return(None)
 
 	@staticmethod
 	def getThreadNr():
@@ -204,11 +179,8 @@ class globstuff:
 		print("Cleaning up and exiting Main Thread")
 		globstuff.server.sslSock.close()
 		globstuff.control.shutdown()
-		# TODO: move to hwcontrol shutdown
-		# for mcp in globstuff.mcplist:
-		# 	mcp.allOff()
-		# GPIO.cleanup()
 		print("Cleanup done.")
+		logging.info("Program shutdown complete, without errors.")
 		if (globstuff.shutdownOpt == "-r" or globstuff.shutdownOpt == "-x"):
 			if (globstuff.shutdownOpt == "-x"):
 				globstuff.shutdownOpt = "-h"

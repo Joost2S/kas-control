@@ -1,33 +1,40 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.1.00	10-05-2019
+# v0.1.01	16-05-2019
 
 
 import logging
-import smbus
 
 from Code.kascontrol.electronics.drivers.arduinoFlowmeter import ArduinoFlowmeter
 from Code.kascontrol.electronics.drivers.flowsensor import FlowMeter
+from Code.kascontrol.globstuff import globstuff as gs
 
 
 class FlowSensorManager(object):
 
-	allowedTypes = ["arduino", "direct"]
+	allowedTypes = ["direct"]
 	arduinos = []
 	devices = {}
-	bus = None
+	smbus = None
 
-	def __init__(self, bus=None):
+	def __init__(self, gpio, smbus=None):
 		super(FlowSensorManager, self).__init__()
-		if bus is None:
-			self.bus = smbus.SMBus(1)
-		else:
-			self.bus = bus
 
-	def setArduinos(self, setup):
-		for dev in setup:
-			self.arduinos.append(ArduinoFlowmeter(dev["address"], self.bus))
+		self.smbus = smbus
+		self.gpio = gpio
+		if self.smbus is not None:
+			self.allowedTypes.append("arduino")
+			self.__setArduinos()
+
+	def __setArduinos(self):
+		data = gs.getSetupFile("hardware")
+		try:
+			devices = data["arduino-flowsensor"]
+		except KeyError:
+			return
+		for dev in devices:
+			self.arduinos.append(ArduinoFlowmeter(dev["address"], self.smbus))
 
 	def setChannel(self, sname, args):
 		if sname in self.devices.keys():

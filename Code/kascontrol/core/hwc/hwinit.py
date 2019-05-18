@@ -8,6 +8,7 @@ from abc import ABCMeta, abstractmethod
 import json
 import logging
 import smbus
+import spidev
 
 from Code.kascontrol.core.group import Group
 from Code.kascontrol.electronics.drivers.floatswitch import FloatSwitch
@@ -15,10 +16,10 @@ from Code.kascontrol.electronics.drivers.hd44780 import Adafruit_CharLCD
 from Code.kascontrol.electronics.drivers.ina219 import INA219
 from Code.kascontrol.electronics.drivers.fan import Fan
 from Code.kascontrol.electronics.drivers.ledbar import LEDbar
-from Code.kascontrol.electronics.drivers.mcp3x08 import MCP3208
 from Code.kascontrol.electronics.drivers.powerLEDs import PowerLEDcontroller
 from Code.kascontrol.electronics.drivers.pump import Pump
 from Code.kascontrol.electronics.drivers.sigLED import sigLED
+from Code.kascontrol.electronics.managers.adcmanager import ADCmanager
 from Code.kascontrol.electronics.managers.flowsensormanager import FlowSensorManager
 from Code.kascontrol.electronics.managers.gpiomanager import GPIOManager
 from Code.kascontrol.electronics.managers.lcdcontrol import lcdController
@@ -34,9 +35,13 @@ class HWinit(HWbase):
 	def __init__(self):
 		super(HWinit, self).__init__()
 
+		gs.hwOptions = gs.getSetupFile("hardware")["options"]
 		self.__i2cBus = smbus.SMBus(1)
 		self.__gpio = GPIOManager(self.__i2cBus)
-		self.__adc = MCP3208(spi=gs.spi, dev=0,
+		self.spi = spidev.SpiDev()
+		self.spi.max_speed_hz = 2000000
+		self.spi.open(0, spi)
+		self.__adcMGR = ADCmanager(spi=gs.spi, dev=0,
 		                             tLock=gs.spiLock,
 		                             gpio=self.__gpio)
 		self.__connectedCheckValue = self.__adc.getResolution() * 0.05

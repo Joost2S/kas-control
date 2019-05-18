@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v1.2.01	10-05-2019
+# v1.2.02	17-05-2019
 
 
 # TODO: import hashlib
@@ -11,6 +11,7 @@ import socket
 import ssl
 
 from Code.kascontrol.globstuff import globstuff as gs
+from Code.kascontrol.utils.errors import ShutdownError
 from Code.kascontrol.utils.protothread import ProtoThread
 from .commands.Adp import Adp
 from .commands.Cth import Cth
@@ -196,18 +197,18 @@ class Server(object):
 			if (str(data[0]).lower() == "exit"):
 				break
 
-	def handleDataForGui(self, data):
+	def handleDataForGui(self, indata):
 
-		command = str(data[0]).lower()
+		command = str(indata[0]).lower()
 		if (command not in self.commands):
 			returnData = {"succes": False, "data": "Invalid command."}
 		else:
 			args = None
-			if (len(data) > 1):
-				args = data[1]
+			if (len(indata) > 1):
+				args = indata[1]
 			try:
-				s, data = self.commands[command]("GUI").runCommand(args)
-				returnData = {"succes": s, "data": data}
+				s, outdata = self.commands[command]("GUI").runCommand(args)
+				returnData = {"succes": s, "data": outdata}
 			except ShutdownError as text:
 				raise ShutdownError(text)
 		jsonFile = json.dumps(returnData)
@@ -297,7 +298,3 @@ class Client(ProtoThread):
 		print("Starting thread{0}: {1}".format(self.threadID, self.name))
 		gs.server.clientthread(self.args[0], self.args[1], self.args[2])
 		print("Exiting thread{0}: {1}".format(self.threadID, self.name))
-
-
-class ShutdownError(Exception):
-	pass

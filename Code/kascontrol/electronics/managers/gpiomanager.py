@@ -87,28 +87,25 @@ class GPIOManager(object):
 			self.devByAddr[dev["address"]] = device
 			self.devSetups.append(dev)
 
-	def setPin(self, device, pin, state, args=None, devAddr=None, devNr=None, devDes=None):
+	def setPin(self, pin, state, devAddr=None, devNr=None, devDes=None, args=None):
 
+		if devAddr is devNr is devDes is None:
+			return False
 		if self.finalized is True:
+			if devAddr is not None:
+				device = devAddr
+			elif devNr is not None:
+				device = devNr
+			else:
+				device = devDes
 			logging.debug("Tried to set pin {} on device {} when GPIO is already enabled".format(pin, device))
 			return False
 		dev = self.__getDevice(number=devNr, address=devAddr, designation=devDes)
 		if isinstance(dev, (mcp23017, mcp23008)):
 			return self.__setmcp230xxPin(dev, pin, state)
-		if device.lower() == "rpi":
+		if isinstance(dev, GPIO):
 			return self.__setRPiPin(pin, state, args)
 		return False
-
-	def addInterrupt(self, pin, edge, callback):
-
-		try:
-			p = self.pinList[pin]
-		except KeyError:
-			logging.debug("Interrupt requested for unknown pin.")
-			return False
-		if p["state"] is False:
-			logging.debug("Tried to add interrupt for output pin.")
-			return False
 
 	def __setmcp230xxPin(self, device, pin, state):
 
@@ -116,6 +113,8 @@ class GPIOManager(object):
 			return False
 		uid = device.setPin(pin=pin, direction=state, exclusive=True)
 		self.pinList[uid] = {"device": device,
+		                     "input": device.getPinState,
+		                     "output": device.output,
 		                     "address": device.devAddr,
 		                     "pin": pin,
 		                     "state": state}
@@ -129,8 +128,24 @@ class GPIOManager(object):
 			state = GPIO.IN
 		else:
 			state = GPIO.OUT
-		GPIO.setup(pin, state, pull_up_down=GPIO.PUD_DOWN)
+		pud = None
+		try:
+			if args["pud"] == "down":
+				pud = GPIO.PUD_DOWN
+			elif args["pud"] == "up":
+				pud = GPIO.PUD_UP
+			elif args["pud"] == "both":
+				pud = GPIO.PUD_UP
+		except KeyError:
+			pass
+		GPIO.setup(pin, state, pull_up_down=pud)
 		uid = uuid.uuid4()
+		self.pinList[uid] = {"device": GPIO,
+		                     "input": GPIO.input,
+		                     "output": GPIO.output,
+		                     "address": "rpi",
+		                     "pin": pin,
+		                     "state": state}
 		return uid
 
 	def __checkPinToSet(self, address, pin):
@@ -145,12 +160,57 @@ class GPIOManager(object):
 		self.setPins.append(setPin)
 		return True
 
+	def addInterrupt(self, pin, edge, callback, args=None):
+
+		try:
+			p = self.pinList[pin]
+		except KeyError:
+			logging.debug("Interrupt requested for unknown pin.")
+			return False
+		if p["state"] is False:
+			logging.debug("Tried to add interrupt on output pin.")
+			return False
+		if isinstance(p["device"], GPIO):
+			self.__setRpiInterrupt(p, edge, callback, args)
+		elif isinstance(p["device"], (mcp23017, mcp23008)):
+			p["device"].addInterruptInput(pin=p["pin"],
+			                              callback=callback,
+			                              edge=edge)
+
+	def __setRpiInterrupt(self, pin, edge, callback, args):
+		if edge.lower() == "rising":
+			edge = GPIO.RISING
+		elif edge.lower() == "falling":
+			edge = GPIO.FALLING
+		elif edge.lower() == "both":
+			edge = GPIO.BOTH
+		else:
+			logging.error("Illegal edge for pin {} on rPi.GPIO".format(pin["pin"]))
+			return
+		bouncetime = None
+		try:
+			bouncetime = args["bouncetime"]
+		except KeyError:
+			pass
+		GPIO.add_event_detect(channel=pin["pin"],
+		                      edge=edge,
+		                      callback=callback,
+		                      bouncetime=bouncetime)
+
 	def finalize(self):
 		self.finalized = True
 		del(self.setPins)
 		for dev in self.devByAddr.values():
 			if isinstance(dev, (mcp23017, mcp23008)):
 				dev.engage()
+
+	def cleanup(self):
+
+		self.finalized = False
+		for dev in self.devByAddr.values():
+			if isinstance(dev, (mcp23017, mcp23008)):
+				dev.allOff()
+		GPIO.cleanup()
 
 	def getState(self, number=None, address=None, pin=None):
 
@@ -187,3 +247,23 @@ class GPIOManager(object):
 	def getSetups(self):
 
 		return self.devSetups
+
+	def input(self, pin):
+
+		if not self.finalized:
+			return
+		try:
+			p = self.pinList[pin]
+			return p["input"](p["pin"])
+		except KeyError:
+			logging.debug("Pin {} not found.".format(pin))
+
+	def output(self, pin, state):
+
+		if not self.finalized:
+			return
+		try:
+			p = self.pinList[pin]
+			return p["output"](p["pin"], state)
+		except KeyError:
+			logging.debug("Pin {} not found.".format(pin))

@@ -21,7 +21,7 @@ from .hwc.powercontrollerinterface import PowerControllerInterface as pci
 from .hwc.powerledinterface import PowerLEDinterface as pli
 from .hwc.requestdata import RequestData as rqd
 from .hwc.waterflowsensorinterface import WaterFlowSensorInterface as wfi
-# from .hwc.hwspoof import HWspoof as hws
+# from .hwc.hwinit import HWinit as ini
 
 
 class hwControl(wfi, rqd, pli, pci, hws, hwm, hwg, fsi, fni, dbc, ini):
@@ -151,6 +151,7 @@ class hwControl(wfi, rqd, pli, pci, hws, hwm, hwg, fsi, fni, dbc, ini):
 				ina.reset()
 		if (gs.hwOptions["status LED"]):
 			self.__statusLED.disable()
+		self.__gpio.cleanup()
 
 	@abstractmethod
 	def requestPower(self, *cur):

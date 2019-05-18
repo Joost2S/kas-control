@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.10.03	12-05-2019
+# v0.10.04	17-05-2019
 
 """
 This is a python driver for an i2c MCP23017. python-smbus must be installed for this driver to work.
@@ -428,10 +428,10 @@ class mcp230xx(object):
 			return True
 		return False
 
-	def addInterruptInput(self, pin, obj, trig):
+	def addInterruptInput(self, pin, callback, edge):
 		"""Add an object which has a run() method which will be called when interrupt pin is triggered."""
 
-		if (not trig.lower() in self.trigger.keys()):
+		if (not edge.lower() in self.trigger.keys()):
 			logging.debug("Invalid trigger type.")
 			return
 
@@ -443,37 +443,44 @@ class mcp230xx(object):
 					return
 				# Check to see if pin is set as output.
 				if (bank[pin].direction):
-					bank[pin].defVal = self.trigger[trig][0]
-					bank[pin].intCon = self.trigger[trig][1]
-					bank[pin].intEn = self.trigger[trig][2]
-					self.interruptObjects[pin] = obj
+					bank[pin].defVal = self.trigger[edge][0]
+					bank[pin].intCon = self.trigger[edge][1]
+					bank[pin].intEn = self.trigger[edge][2]
+					self.interruptObjects[pin] = callback
 				else:
-					logging.debug("pin {}:{} is not set as output.".format(hex(self.devAddr), pin))
+					logging.debug("pin {}:{} is not set as input.".format(hex(self.devAddr), pin))
 
 	def runInterrupt(self, *args):
 
 		p = self.getInterruptPin()
 		print("{} args: {}\t{}".format(hex(self.devAddr), args[0], p))
-		if (p in self.interruptObjects):
+		if p in self.interruptObjects:
 			# check for triggertype from INTCON to see if to send state along
 			state = None
 			if (p[0] == "A"):
 				# If pin gives interrupt on both RISE and FALL, add current state to return data.
-				if (not self.GPA[int(p[1])].intCon):
+				if not self.GPA[int(p[1])].intCon:
 					state = self.getPinState(p)
 			elif (p[0] == "B"):
-				if (not self.GPB[int(p[1])].intCon):
+				if not self.GPB[int(p[1])].intCon:
 					state = self.getPinState(p)
 #			try:
-			if (state is None):
-				self.interruptObjects[p].run()
+			if state is None:
+				self.interruptObjects[p]()
 			else:
-				self.interruptObjects[p].run(state)
+				self.interruptObjects[p](state)
 				print(p, " state")
 #			except:
 #				logging.warning("Failed to run the run() method for the object for pin {}:{}".format(hex(self.devAddr), p))
 		else:
 			logging.warning("Pin {}:{} has no associated object.".format(hex(self.devAddr), p))
+
+	def removeInterrupt(self, pin):
+
+		try:
+			del(self.interruptObjects[pin])
+		except KeyError:
+			logging.debug("No interrupt found to remove on pin {}".format(pin))
 
 
 class mcp23008(mcp230xx):
