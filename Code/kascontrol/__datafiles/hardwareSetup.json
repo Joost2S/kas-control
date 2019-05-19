@@ -56,53 +56,60 @@
         "spiChannel": 0,
         "board": "main",
         "boardDesignation": "u1",
-        "channels": {
-          "0": {
-            "flip-flop": null
+        "channels": [
+          {
+            "flip-flop": false
           },
-          "1": {
-            "flip-flop": {
-              "pin0": "0A0",
-              "pin1": "0A1"
-            }
+          {
+            "flip-flop": true,
+            "pins": [
+              {
+                "devNumber": "0",
+                "pin": "A0"
+              },
+              {
+                "devNumber": "0",
+                "pin": "A1"
+              }
+            ]
           },
-          "2": {
+          {
             "flip-flop": {
               "pin0": "0A2",
               "pin1": "0A3"
             }
           },
-          "3": {
+          {
             "flip-flop": {
               "pin0": "0A4",
               "pin1": "0A5"
             }
           },
-          "4": {
+          {
             "flip-flop": {
               "pin0": "0B0",
               "pin1": "0B1"
             }
           },
-          "5": {
+          {
             "flip-flop": {
               "pin0": "0B2",
               "pin1": "0B3"
             }
           },
-          "6": {
+          {
             "flip-flop": {
               "pin0": "0B4",
               "pin1": "0B5"
             }
           },
-          "7": {
+          {
             "flip-flop": {
               "pin0": "0B6",
               "pin1": "0B7"
             }
           }
-        }
+        ]
       }
     ]
   },
@@ -132,5 +139,12 @@
         "rShunt": 0.040
       }
     ]
+  },
+  "74LS138": {
+    "pins": {
+      "a0": 0,
+      "a1": 1,
+      "a2": 2
+    }
   }
 }

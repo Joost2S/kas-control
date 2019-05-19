@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.08.01	11-05-2019
+# v0.08.02	19-05-2019
 
 
 import logging
@@ -9,12 +9,12 @@ import logging
 from Code.kascontrol.core.database import Database
 from Code.kascontrol.core.db.datalog import DatalogThread
 from Code.kascontrol.core.hwcontrol import hwControl
-from Code.kascontrol.core.powermanager import PowerManager
 from Code.kascontrol.core.hwc.hwmonitor import Monitor
+from Code.kascontrol.core.network import Server
+from Code.kascontrol.core.powermanager import PowerManager
 from Code.kascontrol.electronics.drivers import pushbutton
 from Code.kascontrol.globstuff import globstuff as gs
-from Code.kascontrol.core.network import Server
-from Code.kascontrol.core.network import ShutdownError
+from Code.kascontrol.utils.errors import AbortInitError, ShutdownError
 
 
 def run():
@@ -46,6 +46,8 @@ def run():
 		monitor.start()
 
 		gs.server.serverLoop()
+	except AbortInitError:
+		print("Something went wrong upon initalizing the server. See log for details.")
 	except ShutdownError:
 		logging.info("Shutdown by client.")
 	except KeyboardInterrupt:

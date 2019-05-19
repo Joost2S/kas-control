@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
 
 # Author: J. Saarloos
-# v1.05.01	24-04-2019
+# v1.05.03	19-05-2019
 
 """
 For controlling MCP3208 and MCP3008 adc for light and moisture readings.
@@ -14,7 +14,6 @@ For Details about MCP3008/3004: http://ww1.microchip.com/downloads/en/DeviceDoc/
 
 from abc import ABCMeta, abstractmethod
 import logging
-import spidev
 import threading
 
 
@@ -27,10 +26,9 @@ class channel(object):
 	ff = False
 	ffstate = False
 
-	def __init__(self, chan, mcp = None, p1 = None, p2 = None):
+	def __init__(self, chan, p1=None, p2=None):
 
 		self.chan = chan
-		self.mcp = mcp
 		self.p1 = p1
 		self.p2 = p2
 		if (p1 is not None and p2 is not None):
@@ -53,16 +51,11 @@ class MCP3x0x(object):
 	__tlock = None
 
 
-	def __init__(self, spi, dev = None, tLock = None, gpio = None):
+	def __init__(self, spi, spiChan, tLock=None, gpio=None):
 
 		# Setup for the adc connected with spi
-		if (dev is None):
-			self.spi = spidev.SpiDev()
-			self.spi.max_speed_hz = 2000000
-			self.spi.open(0, spi)
-		else:
-			self.spi = spi
-			self.spiDev = dev
+		self.spi = spi
+		self.spiChan = spiChan
 		self.gpio = gpio
 		if (tLock is not None):
 			self.__tlock = tLock
@@ -80,44 +73,39 @@ class MCP3x0x(object):
 		if (samples > 0):
 			self.samples = samples
 
-	def setChannel(self, name, chan, p1 = None, p2 = None, gpio = None):
-		"""Define flip-flop pins for each channel. Optional to define an alternate gpio for the channel."""
+	def setChannel(self, name, chan, p1=None, p2=None):
+		"""Define flip-flop pins for each channel."""
 
 		if (not (0 >= chan > self.chanAmount)):
-			logging.debug("Incorrect channel: " + str(chan))
+			logging.debug("Incorrect channel: {}".format(chan))
 			return
 		if (name in self.channels):
 			logging.debug("Name must be unique. Please make sure all channels have a different name. " + str(name))
 			return
 		for c in self.channels:
 			if (self.channels[c].chan == chan):
-				logging.debug("Channel defined already: " + str(chan))
+				logging.debug("Channel {} defined already.".format(chan))
 				return
-		if (gpio is None):
-			mcp = self.gpio
-		else:
-			mcp = None
 		if (p1 is None and p2 is None):
 			self.channels[name] = channel(chan)
 		elif (p1 is not None and p2 is not None):
-			self.channels[name] = channel(chan, mcp, p1, p2)
+			self.channels[name] = channel(chan, p1, p2)
 		else:
 			logging.debug("Only one flip flop pin given, please give 2 pins for a complete flip-flop circuit.")
 
-	def getMeasurement(self, name, perc = False):
+	def getMeasurement(self, name, perc=False):
 		"""Get a reading of soil moisture level."""
 
 		level = 0.0
-		gpo = self.channels[name].mcp
 		with self.__tlock:
 			for i in range(self.samples):
 				if (self.channels[name].ff):
-					gpo.output(self.channels[name].p1, self.channels[name].ffstate)
-					gpo.output(self.channels[name].p2, not self.channels[name].ffstate)
+					self.gpio.output(self.channels[name].p1, self.channels[name].ffstate)
+					self.gpio.output(self.channels[name].p2, not self.channels[name].ffstate)
 					self.channels[name].ffstate = not self.channels[name].ffstate
 				level += self.readChannel(name)
 			if (self.channels[name].ff):
-				gpo.output((self.channels[name].p1, self.channels[name].p2), False)
+				self.gpio.output((self.channels[name].p1, self.channels[name].p2), False)
 		level /= self.samples
 		if(perc):
 			return(self.__convertToPrec(level, 1))
@@ -176,10 +164,7 @@ class MCP320x(MCP3x0x):
 	def readChannel(self, name):
 		args = [4 | 2 | (self.channels[name].chan >> 2),
 		                    (self.channels[name].chan & 3) << 6, 0]
-		if (self.spidev is None):
-			adcdata = self.spi.xfer2(args)
-		else:
-			adcdata = self.spi.xfer(self.spidev, args)
+		adcdata = self.spi.xfer(self.spiChan, args)
 		data = ((adcdata[1] & 15) << 8) + adcdata[2]
 #		adcdata = self.spi.xfer2([96 + (4 * self.channels[name].chan), 0, 0])
 #		data = int((adcdata[1] << 4) + (adcdata[2] >> 4))
@@ -197,10 +182,7 @@ class MCP300x(MCP3x0x):
 
 	def readChannel(self, name):
 		args = [1, (8 + self.channels[name].chan) << 4, 0]
-		if (self.spidev is None):
-			adcdata = self.spi.xfer2(args)
-		else:
-			adcdata = self.spi.xfer(self.spidev, args)
+		adcdata = self.spi.xfer(self.spiChan, args)
 		data = int(((adcdata[1]&3) << 8) + adcdata[2])
 		if (self.debug):
 			self.__debugReturn(name, data)

@@ -1,14 +1,12 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.01	10-05-2019
+# v0.01.03	19-05-2019
 
 
 from abc import ABCMeta, abstractmethod
-import json
 import logging
 import smbus
-import spidev
 
 from Code.kascontrol.core.group import Group
 from Code.kascontrol.electronics.drivers.floatswitch import FloatSwitch
@@ -23,6 +21,7 @@ from Code.kascontrol.electronics.managers.adcmanager import ADCmanager
 from Code.kascontrol.electronics.managers.flowsensormanager import FlowSensorManager
 from Code.kascontrol.electronics.managers.gpiomanager import GPIOManager
 from Code.kascontrol.electronics.managers.lcdcontrol import lcdController
+from Code.kascontrol.electronics.managers.spimanager import SPImanager
 from Code.kascontrol.electronics.managers.tdevmanager import TDevManager
 from Code.kascontrol.globstuff import globstuff as gs
 from .hwbase import HWbase
@@ -38,17 +37,14 @@ class HWinit(HWbase):
 		gs.hwOptions = gs.getSetupFile("hardware")["options"]
 		self.__i2cBus = smbus.SMBus(1)
 		self.__gpio = GPIOManager(self.__i2cBus)
-		self.spi = spidev.SpiDev()
-		self.spi.max_speed_hz = 2000000
-		self.spi.open(0, spi)
-		self.__adcMGR = ADCmanager(spi=gs.spi, dev=0,
-		                             tLock=gs.spiLock,
-		                             gpio=self.__gpio)
-		self.__connectedCheckValue = self.__adc.getResolution() * 0.05
+		self.__spi = SPImanager(self.__gpio)
+		self.__adcMGR = ADCmanager(gpio=self.__gpio, spi=self.__spi)
+		# TODO: make ccv into a function
+		# self.__connectedCheckValue = self.__adcMGR.getResolution() * 0.05
 		self.__tempMGR = TDevManager()
 		self.__flowMGR = FlowSensorManager(self.__i2cBus)
 		self.__setINA219devs()
-		self.__setDataFromFile()
+		self.__setSensorDataFromFile()
 		if (gs.hwOptions["powermonitor"]):
 			gs.pwrmgr.setINA(self.__ina["12v"])
 		self.__statusLED = sigLED(gs.sLEDpin)
@@ -65,7 +61,7 @@ class HWinit(HWbase):
 			self.__fan = Fan(gs.fanPin)
 		self.__gpio.finalize()
 
-	def __setDataFromFile(self):
+	def __setSensorDataFromFile(self):
 		"""Sets all the sensors as defined in the sensors setup file."""
 
 		data = gs.getSetupFile("sensor")["sensorData"]
@@ -83,7 +79,7 @@ class HWinit(HWbase):
 		""""""
 
 		for sensor in sensors["sensors"]:
-			self.__adc.setChannel(sensor["name"], sensor["channel"])
+			self.__adcMGR.setChannel(sensor["name"], sensor["channel"])
 			self.__sensors[sensor["name"]] = sensors["type"]
 			self.__otherSensors.append(sensor["name"])
 

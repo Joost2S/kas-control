@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.01	10-05-2019
+# v0.01.03	19-05-2019
 
 
 from abc import ABCMeta, abstractmethod
@@ -12,10 +12,10 @@ class HWbase(object):
 
 	__metaclass__ = ABCMeta
 
-	__adc = None				# u1
+	__adcMGR = None			# Manages the ADC devices. Currently only supports MCP3x0x devices.
 	__connectedCheckValue = 0	# If value is below this threhold, sensor is considered disconnected
 	__currentstats = ""		# Latest output of the monitor method. Is formatted for display in console.
-	__enabled = True			# Dunno.
+	__enabled = True			# Dunno. TODO: make work or remove when most other things are done.
 	__fan = None				# Reference to fan object.
 	__fanToggleTemp = 45		# Temoerature at which to turn on fan.
 	__floatSwitch = None		# Reference to floatSwitch object
@@ -35,6 +35,7 @@ class HWbase(object):
 	__powerManager = None	# Priority queue to keep track of the powerconsuming devices on the 12v rail.
 	__rawStats = {}			# Dict with the latest results from sensors. {senorName : latestValue}
 	__sensors = OrderedDict()	# {name : type}
+	__spi = None				# SPI manager
 	__spoof = False
 	__statusLED = None		# Reference to status led controller
 	__tempbar = []				# List of sensor names for the temperature LEDbar

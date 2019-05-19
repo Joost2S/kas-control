@@ -1,18 +1,19 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.00	03-02-2019
+# v0.01.02	19-05-2019
 
 
-import RPi.GPIO as GPIO
-import spidev
+import logging
+
+from Code.kascontrol.utils.errors import SpiPinError
 
 
 class SPI_74LS138(object):
 
 	spi = None
 	devices = {}
-	pins = None
+	pins = []
 	lut = [
 		[0, 0, 0],
 		[0, 0, 1],
@@ -24,21 +25,22 @@ class SPI_74LS138(object):
 		[1, 1, 1]
 	]
 
-	def __init__(self, pins):
+	def __init__(self, pins, spi, gpio):
 
-		self.spi = spidev.SpiDev()
-		self.spi.max_speed_hz = 2000000
-		self.pins = pins
-		for pin in pins:
-			GPIO.setup(pin, GPIO.OUT)
-			GPIO.output(pin, GPIO.LOW)
-		self.spi.open(0, 0)
+		self.gpio = gpio
+		self.spi = spi
+		for p in pins:
+			pinID = self.gpio.setPin(p["pin"], False, p["address"])
+			if pinID is False:
+				logging.error("Pin {} could not be set for SPI-74LS138 IC. Aborting init.")
+				raise SpiPinError
+			self.pins.append(pinID)
 
 
 	def xfer(self, dev, args):
 
 		for i, state in enumerate(self.lut[self.devices[dev]]):
-			GPIO.output(self.pins[i], state)
+			self.gpio.output(self.pins[i], state)
 
 		data = self.spi.xfer2(args)
 
