@@ -9,7 +9,7 @@ import logging
 import time
 
 from ..globstuff import globstuff as gs
-from ..utils.protothread import ProtoThread
+from ..utils.threadingutils import ProtoThread
 from .hwc.dbchecks import DBchecks as dbc
 from .hwc.faninterface import FanInterface as fni
 from .hwc.floatswitchinterface import FloatSwitchInterface as fsi

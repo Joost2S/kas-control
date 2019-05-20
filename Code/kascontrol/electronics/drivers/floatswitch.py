@@ -10,7 +10,7 @@ import smtplib
 import time
 
 from Code.kascontrol.globstuff import globstuff as gs
-from Code.kascontrol.utils.protothread import ProtoThread
+from Code.kascontrol.utils.threadingutils import ProtoThread
 
 
 class FloatSwitch(object):

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.01	10-05-2019
+# v0.01.02	20-05-2019
 
 
 from abc import ABCMeta, abstractmethod
@@ -9,7 +9,7 @@ import logging
 import time
 
 from Code.kascontrol.globstuff import globstuff as gs
-from Code.kascontrol.utils.protothread import ProtoThread
+from Code.kascontrol.utils.threadingutils import ProtoThread
 from .hwbase import HWbase
 
 
@@ -83,13 +83,20 @@ class HWmonitor(HWbase):
 		tempsensors = len(self.__tempMGR.getTdevList())
 		if (t is None):
 			if (tempsensors < 5):
-				self.__timeRes = 5
+				tr = 5
 			else:
-				self.__timeRes = tempsensors
+				tr = tempsensors
 		else:
-			t = int(t)
+			try:
+				t = int(t)
+			except ValueError:
+				return False
 			if (t >= 5 and t >= tempsensors * 0.8):
-				self.__timeRes = float(t)
+				tr = float(t)
+			else:
+				return False
+		self.__timeRes = tr
+		self.__adcMGR.setLockTimeout(tr)
 
 	def startMonitor(self):
 		"""Use this function to start monitor to prevent more than 1 instance running at a time."""

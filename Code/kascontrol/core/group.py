@@ -9,7 +9,7 @@ import threading
 import time
 
 from ..globstuff import globstuff as gs
-from ..utils.protothread import ProtoThread
+from ..utils.threadingutils import ProtoThread
 
 
 class Group(object):

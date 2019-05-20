@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.02	19-05-2019
+# v0.01.03	20-05-2019
 
 """
 Manages all ADC pins on supported devices.
@@ -19,12 +19,13 @@ import logging
 import threading
 import uuid
 
-from Code.kascontrol.electronics.drivers.mcp3x08 import MCP3004
-from Code.kascontrol.electronics.drivers.mcp3x08 import MCP3008
-from Code.kascontrol.electronics.drivers.mcp3x08 import MCP3204
-from Code.kascontrol.electronics.drivers.mcp3x08 import MCP3208
+from Code.kascontrol.electronics.drivers.mcp3x0x import MCP3004
+from Code.kascontrol.electronics.drivers.mcp3x0x import MCP3008
+from Code.kascontrol.electronics.drivers.mcp3x0x import MCP3204
+from Code.kascontrol.electronics.drivers.mcp3x0x import MCP3208
 from Code.kascontrol.globstuff import globstuff as gs
 from Code.kascontrol.utils.errors import AbortInitError, ADCconfigError
+from Code.kascontrol.utils.threadingutils import TimeoutLock
 
 
 class ADCmanager(object):
@@ -39,10 +40,10 @@ class ADCmanager(object):
 					# gets deleted upon finalisation of manager
 	pinList = dict() # list of all set pins. Used throughout program lifecycle.
 
-	def __init__(self, gpio, spi):
+	def __init__(self, gpio, spi, timeout):
 		super(ADCmanager, self).__init__()
 
-		self.__adclock = threading.Lock()
+		self.__adclock = TimeoutLock(timeout)
 		self.devices = dict()
 		self.gpio = gpio
 		self.spi = spi
@@ -105,6 +106,8 @@ class ADCmanager(object):
 				dev.setChannel(i, i, ff1, ff2)
 
 	def setChannel(self, channel, address=None, devNr=None, devDes=None):
+
+		# TODO: implement!
 		pass
 
 	def read(self, pin):
@@ -114,3 +117,10 @@ class ADCmanager(object):
 
 	def readPin(self, pin, address=None, devNr=None, devDes=None):
 		pass
+
+	def getResolution(self, pin=None, address=None, devNr=None, devDes=None):
+		pass
+
+	def setLockTimeout(self, t):
+
+		self.__adclock.timeout = 0.5 * t

@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.1.01	09-05-2019
+# v0.1.02	20-05-2019
 
 
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 import logging
 import sqlite3 as sql
 import sys
@@ -41,14 +41,14 @@ class BaseDBinterface(object):
 		"""
 
 		dat = []
-		with (self.__tlock):
+		with self.__tlock():
 			#			try:
 			with sql.connect(self.__fileName) as conn:
 				curs = conn.cursor()
 				curs.execute(dbmsg)
 				data = curs.fetchall()
-				if (data is None or len(data) == 0):
-					return (None)
+				if data is None or len(data) == 0:
+					return None
 				else:
 					for row in data:
 						a = []
@@ -59,7 +59,7 @@ class BaseDBinterface(object):
 		#				print("crap")
 		#			finally:
 		#				conn.close()
-		return (dat)
+		return dat
 
 	def __dbWrite(self, *dbmsgs):
 		"""Use this method to write data to the DB."""
@@ -67,7 +67,7 @@ class BaseDBinterface(object):
 		sortedmsgs = self.__sortmsgs(*dbmsgs)
 
 		try:
-			with (self.__tlock):
+			with self.__tlock():
 				conn = sql.connect(self.__fileName)
 				with conn:
 					curs = conn.cursor()
@@ -75,20 +75,20 @@ class BaseDBinterface(object):
 						curs.execute(dbmsg)
 					conn.commit()
 					updRows = curs.rowcount
-			if (updRows > 1):
+			if updRows > 1:
 				print("updRows:", updRows)
 		except sql.Error as er:
 			logging.debug("er:", er)
-			return (0)
-		return (updRows)
+			return 0
+		return updRows
 
 	def __sortmsgs(self, *dbmsgs):
 		"""Recursive methed to extract all strings from arbitrarily nested arrays."""
 
 		msgs = []
-		if (not isinstance(dbmsgs, str)):
+		if not isinstance(dbmsgs, str):
 			for msg in dbmsgs:
-				if (not isinstance(msg, str)):
+				if not isinstance(msg, str):
 					for m in self.__sortmsgs(*msg):
 						msgs.append(m)
 					pass
@@ -96,13 +96,12 @@ class BaseDBinterface(object):
 					msgs.append(msg)
 		else:
 			msgs.append(dbmsgs)
-		return (msgs)
+		return msgs
 
-	@interval.setter
 	def interval(self, interval):
 		"""Set a new interval in minutes. Will be rounded down to whole seconds."""
 
-		if (interval >= 1.0):
+		if interval >= 1.0:
 			self.__interval = int(interval * 60)
 
 	@staticmethod
@@ -111,10 +110,10 @@ class BaseDBinterface(object):
 
 		for i in range(5):
 			data = gs.control.requestData(name=name, formatted=False)
-			if (data is not False and data is not None):
-				return(data)
+			if data is not False and data is not None:
+				return data
 		logging.warning("Failed to get a measurement for sensor {}.".format(name))
-		return("NULL")
+		return "NULL"
 
 	@staticmethod
 	def __printutf(text):
@@ -122,7 +121,3 @@ class BaseDBinterface(object):
 		t = text.encode("utf-8")
 		sys.stdout.buffer.write(t)
 		print()
-
-
-class DBValidationError(Exception):
-	pass

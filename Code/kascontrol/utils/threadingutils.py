@@ -1,11 +1,31 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.00	25-04-2019
+# v0.01.01	20-05-2019
 
 
 from abc import ABCMeta, abstractmethod
+from contextlib import contextmanager
 import threading
+
+
+class TimeoutLock(object):
+	def __init__(self, timeout):
+		self._lock = threading.Lock()
+		self.timeout = timeout
+
+	def acquire(self):
+		return self._lock.acquire(blocking=True, timeout=self.timeout)
+
+	@contextmanager
+	def acquire_timeout(self):
+		result = self.acquire()
+		yield result
+		if result:
+			self.release()
+
+	def release(self):
+		self._lock.release()
 
 
 class ProtoThread(threading.Thread):

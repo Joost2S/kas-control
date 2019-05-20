@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
 
 # Author: J. Saarloos
-# v1.05.03	19-05-2019
+# v1.05.04	20-05-2019
 
 """
 For controlling MCP3208 and MCP3008 adc for light and moisture readings.
@@ -14,7 +14,6 @@ For Details about MCP3008/3004: http://ww1.microchip.com/downloads/en/DeviceDoc/
 
 from abc import ABCMeta, abstractmethod
 import logging
-import threading
 
 
 class channel(object):
@@ -59,8 +58,6 @@ class MCP3x0x(object):
 		self.gpio = gpio
 		if (tLock is not None):
 			self.__tlock = tLock
-		else:
-			self.__tlock = threading.Lock()
 
 
 	@abstractmethod
@@ -97,7 +94,7 @@ class MCP3x0x(object):
 		"""Get a reading of soil moisture level."""
 
 		level = 0.0
-		with self.__tlock:
+		with self.__tlock.acquire_timeout():
 			for i in range(self.samples):
 				if (self.channels[name].ff):
 					self.gpio.output(self.channels[name].p1, self.channels[name].ffstate)

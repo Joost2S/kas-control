@@ -9,8 +9,8 @@ import RPi.GPIO as GPIO
 import uuid
 
 from Code.kascontrol.globstuff import globstuff as gs
-from Code.kascontrol.electronics.drivers.mcp23017 import mcp23017
-from Code.kascontrol.electronics.drivers.mcp23017 import mcp23008
+from Code.kascontrol.electronics.drivers.mcp230xx import mcp23017
+from Code.kascontrol.electronics.drivers.mcp230xx import mcp23008
 
 
 class GPIOManager(object):

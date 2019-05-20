@@ -10,8 +10,8 @@ import time
 
 from Code.kascontrol.globstuff import globstuff as gs
 from .base import BaseDBinterface
-from .base import DBValidationError
-from Code.kascontrol.utils.protothread import ProtoThread
+from Code.kascontrol.utils.errors import DBValidationError
+from Code.kascontrol.utils.threadingutils import ProtoThread
 
 
 class Datalog(BaseDBinterface):

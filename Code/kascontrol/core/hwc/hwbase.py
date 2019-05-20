@@ -41,7 +41,7 @@ class HWbase(object):
 	__tempbar = []				# List of sensor names for the temperature LEDbar
 	__template = ""			# Template for __currentstats
 	__tempMGR =  None			# Manager for DS18B20 temperature sensors
-	__timeRes = 0.0			# How often the sensors get polled in seconds.
+	__timeRes = 10.0			# How often the sensors get polled in seconds.
 
 	def __init__(self):
 		super(HWbase, self).__init__()
@@ -49,7 +49,7 @@ class HWbase(object):
 	def getADCres(self):
 		"""Returns the resultion of the installed ADC."""
 
-		return(self.__adc.getResolution())
+		return(self.__adcMGR.getResolution())
 
 	@abstractmethod
 	def requestData(self, stype=None, name=None, formatted=None):

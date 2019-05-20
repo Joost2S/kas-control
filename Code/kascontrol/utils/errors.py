@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.1.01	19-05-2019
+# v0.1.02	20-05-2019
 
 
 class AbortInitError(Exception):
@@ -9,6 +9,10 @@ class AbortInitError(Exception):
 
 
 class ADCconfigError(AbortInitError):
+	pass
+
+
+class DBValidationError(Exception):
 	pass
 
 

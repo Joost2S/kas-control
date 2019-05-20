@@ -1,18 +1,18 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.1.01	10-05-2019
+# v0.1.02	20-05-2019
 
 
 from abc import ABCMeta#, abstractmethod
 import logging
 import os
 import sqlite3 as sql
-import threading
 
 from .base import BaseDBinterface
-from .base import DBValidationError
 from Code.kascontrol.globstuff import globstuff as gs
+from Code.kascontrol.utils.errors import DBValidationError
+from Code.kascontrol.utils.threadingutils import TimeoutLock
 
 
 class DBinit(BaseDBinterface):
@@ -24,10 +24,10 @@ class DBinit(BaseDBinterface):
 
 		self.__allowedTypes = ["mst", "light", "flow", "temp", "cputemp", "pwr"]
 		self.__fileName = gs.dataloc + "datalog.db"
-		self.interval = 5
+		self.__interval = 5 * 60
 		self.__species = ["Generic", "Weed", "Cannabis", "Marijuana", "Hemp", "Tomato", "Chili pepper"]
 		self.__tables = ["sensorData", "sensorSetup", "groups", "plants", "plantTypes", "watering"]
-		self.__tlock = threading.Lock()
+		self.__tlock = TimeoutLock(5).acquire_timeout
 		self.__views = ["defaultview", "sensorCheck"]
 		for s, t in gs.control.getSensors().items():
 			self.__sensors[s.replace("-", "_")] = t

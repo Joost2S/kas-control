@@ -12,7 +12,7 @@ import ssl
 
 from Code.kascontrol.globstuff import globstuff as gs
 from Code.kascontrol.utils.errors import ShutdownError
-from Code.kascontrol.utils.protothread import ProtoThread
+from Code.kascontrol.utils.threadingutils import ProtoThread
 from .commands.Adp import Adp
 from .commands.Cth import Cth
 from .commands.Cur import Cur
