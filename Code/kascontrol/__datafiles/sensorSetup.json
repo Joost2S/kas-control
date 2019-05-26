@@ -1,16 +1,14 @@
 {
-  "version": "0.09.00",
-  "date": "11-05-2019",
+  "version": "0.09.01",
+  "date": "24-05-2019",
   "sensorData": {
     "light": {
       "type": "light",
       "sensors": [
         {
           "name": "ambientl",
-          "setup": {
-            "channel": 7,
-            "type": "MCP3208"
-          }
+          "channel": 7,
+          "devNumber": 0
         }
       ]
     },
@@ -19,38 +17,28 @@
       "sensors": [
         {
           "name": "out_sun",
-          "setup": {
-            "address": "03168bf394ff",
-            "type": "ds18b20"
-          }
+          "address": "03168bf394ff",
+          "type": "ds18b20"
         },
         {
           "name": "out_shade",
-          "setup": {
-            "address": "000006d218ac",
-            "type": "ds18b20"
-          }
+          "address": "000006d218ac",
+          "type": "ds18b20"
         },
         {
           "name": "ambientt",
-          "setup": {
-            "address": "000006d218ac",
-            "type": "ds18b20"
-          }
+          "address": "000006d218ac",
+          "type": "ds18b20"
         },
         {
           "name": "psu",
-          "setup": {
-            "address": null,
-            "type": "ds18b20"
-          }
+          "address": null,
+          "type": "ds18b20"
         },
         {
           "name": "CPU",
-          "setup": {
-            "address": null,
-            "type": "cpu"
-          }
+          "address": null,
+          "type": "cpu"
         }
       ]
     },

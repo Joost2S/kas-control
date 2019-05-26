@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v1.2.02	17-05-2019
+# v1.2.03	26-05-2019
 
 
 # TODO: import hashlib
@@ -49,21 +49,21 @@ class Server(object):
 	# commands
 	@property
 	def commands(self):
-		return(self.__commands)
+		return self.__commands
 	@commands.setter
 	def commands(self, commands):
 		self.__commands = commands
 	# sslSock
 	@property
 	def sslSock(self):
-		return(self.__sslSock)
+		return self.__sslSock
 	@sslSock.setter
 	def sslSock(self, sslSock):
 		self.__sslSock = sslSock
 	# clientNr
 	@property
 	def clientNr(self):
-		return(self.__clientNr)
+		return self.__clientNr
 	@clientNr.setter
 	def clientNr(self, clientNr):
 		self.__clientNr = clientNr
@@ -83,12 +83,12 @@ class Server(object):
 					Set, Get, Log,
 					Adp, Rmp, Rnp,
 					Cth, Sen, Gas]
-		if (gs.hwOptions["powermonitor"]):
+		if gs.hwOptions["powermonitor"]:
 			comms.extend([Led, Stl,
 					Pwr])
-		if (gs.hwOptions["ledbars"]):
+		if gs.hwOptions["ledbars"]:
 			comms.extend([Lbm])
-		if (gs.hwOptions["lcd"]):
+		if gs.hwOptions["lcd"]:
 			comms.extend([Lcd])
 		for command in comms:
 			self.commands[command().command] = command
@@ -111,8 +111,8 @@ class Server(object):
 												keyfile=gs.dataloc + "key.pem")
 		print("Socket secured.")
 
-		while(1):
-			if (gs.port == 7505):
+		while 1:
+			if gs.port == 7505:
 				gs.port = 7500
 			try:
 				self.sslSock.bind((gs.host, gs.port))
@@ -131,21 +131,24 @@ class Server(object):
 		"""Main loop, waiting to accept new connections."""
 
 		try:
-			while (gs.running):
+			while gs.running:
 				# Wait to accept a connection - blocking call.
 				conn, addr = self.sslSock.accept()
 				logging.info("New connection from: {}:{}".format(*addr))
 
-				if (addr[0] != "127.0.0.1"):
+				if addr[0] != "127.0.0.1":
 					try:
-						nt = Client(gs.getThreadNr(), "client-" + str(self.clientNr), args = (conn, addr[0], str(addr[1])))
+						nt = Client(threadID=gs.getThreadNr(),
+			            name="client-{}".format(self.clientNr),
+			            args=(conn, addr[0], str(addr[1]))
+		            )
 						nt.start()
 						gs.draadjes.append(nt)
 					except ConnectionResetError:
 						logging.debug("Connection reset with client-" + str(self.clientNr))
 					# except Exception as e:
 					# 	logging.exception("Bad client.")
-				elif (gs.shutdownOpt is not None):
+				elif gs.shutdownOpt is not None:
 					raise ShutdownError
 				self.clientNr += 1
 		except KeyboardInterrupt:
@@ -158,7 +161,7 @@ class Server(object):
 		try:
 			conn.send(bytes("Welcome to Kas control. Type 'help' for available commands.\n", "utf-8"))
 			clientType = conn.recv(32).decode()
-			if (clientType not in self.supportedClientTypes):
+			if clientType not in self.supportedClientTypes:
 				conn.send(bytes("NOT", "utf-8"))
 				conn.close()
 				logging.debug("Client of type {} is not supported. Connection closed.")
@@ -169,9 +172,9 @@ class Server(object):
 			print("Send failed")
 			return
 		logging.info("{}-client connected with {}:{}".format(clientType, ip, port))
-		if (clientType == "TERMINAL"):
+		if clientType == "TERMINAL":
 			self.terminalClientThread(conn)
-		elif (clientType == "GUI"):
+		elif clientType == "GUI":
 			self.guiClientThread(conn)
 		conn.close()
 		logging.info("Connection closed with " + ip + ":" + port)
@@ -185,7 +188,7 @@ class Server(object):
 		# {"succes": Bool,
 		#  "data": any format}
 
-		while (gs.running):
+		while gs.running:
 			# Receiving data from client
 			data = json.loads(conn.recv(1024).decode())
 
@@ -194,13 +197,15 @@ class Server(object):
 			for chunk in returnData:
 				conn.recv(4)
 				conn.sendall(bytes(chunk, "utf-8"))
-			if (str(data[0]).lower() == "exit"):
+			if str(data[0]).lower() == "exit":
 				break
 
 	def handleDataForGui(self, indata):
 
 		command = str(indata[0]).lower()
-		if (command not in self.commands):
+		if gs.running is False:
+			returnData = {"succes": True, "data": "ServerShutdown"}
+		elif command not in self.commands:
 			returnData = {"succes": False, "data": "Invalid command."}
 		else:
 			args = None
@@ -218,11 +223,11 @@ class Server(object):
 		for i in range(0, len(jsonFile), chunkSize):
 			chunks.append(jsonFile[i:i+chunkSize])
 			count += 1
-		return(count, chunks)
+		return count, chunks
 
 	def terminalClientThread(self, conn):
 
-		while (gs.running):
+		while gs.running:
 			# Receiving data from client
 			data = conn.recv(256).decode().split()
 			logging.info((len(data), data))
@@ -242,23 +247,25 @@ class Server(object):
 			for j in range(i + 1):
 				conn.recv()
 				conn.sendall(bytes(msg[j], "utf-8"))
-			if (str(data[0]).lower() == "exit"):
+			if str(data[0]).lower() == "exit":
 				break
 
 	def handleDataForTerminal(self, data):
 		"""Handles incoming data and returns a reply for the client."""
 
 		command = str(data[0]).lower()
-		if (command not in self.commands):
-			return(0, ["Not a valid command. " + command])
+		if gs.running is False:
+			return 0, ["ServerShutdown"]
+		if command not in self.commands:
+			return 0, ["Not a valid command. " + command]
 		args = None
-		if (len(data) > 1):
+		if len(data) > 1:
 			args = []
 			for item in data[1:]:
 				args.append(str(item).lower())
-			if (command == "help"):
+			if command == "help":
 				args = (self.commands, args[0])
-		elif (command == "help"):
+		elif command == "help":
 			args = (self.commands,)
 		try:
 			check, msg = self.commands[command]("TERMINAL").runCommand(args)
@@ -268,7 +275,7 @@ class Server(object):
 		# Removing trailing white lines
 		msg = msg.splitlines()
 		for line in reversed(msg):
-			if (line.strip()):
+			if line.strip():
 				break
 			else:
 				msg = msg[:-1]

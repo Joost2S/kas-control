@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.03	19-05-2019
+# v0.01.04	23-05-2019
 
 
 from abc import ABCMeta, abstractmethod
@@ -24,6 +24,7 @@ from Code.kascontrol.electronics.managers.lcdcontrol import lcdController
 from Code.kascontrol.electronics.managers.spimanager import SPImanager
 from Code.kascontrol.electronics.managers.tdevmanager import TDevManager
 from Code.kascontrol.globstuff import globstuff as gs
+from Code.kascontrol.utils.errors import HwInitError
 from .hwbase import HWbase
 
 
@@ -38,7 +39,7 @@ class HWinit(HWbase):
 		self.__i2cBus = smbus.SMBus(1)
 		self.__gpio = GPIOManager(self.__i2cBus)
 		self.__spi = SPImanager(self.__gpio)
-		self.__adcMGR = ADCmanager(gpio=self.__gpio, spi=self.__spi)
+		self.__adcMGR = ADCmanager(gpio=self.__gpio, spi=self.__spi, timeout=5)
 		# TODO: make ccv into a function
 		# self.__connectedCheckValue = self.__adcMGR.getResolution() * 0.05
 		self.__tempMGR = TDevManager()
@@ -79,8 +80,9 @@ class HWinit(HWbase):
 		""""""
 
 		for sensor in sensors["sensors"]:
-			self.__adcMGR.setChannel(sensor["name"], sensor["channel"])
-			self.__sensors[sensor["name"]] = sensors["type"]
+			uid = self.__adcMGR.setChannel(sensor["pin"], devNr=sensor["devNumber"])
+			self.__sensors[sensor["name"]] = {"type": sensors["type"],
+			                                  "id": uid}
 			self.__otherSensors.append(sensor["name"])
 
 	def __setTempSensors(self, sensors):
@@ -89,10 +91,12 @@ class HWinit(HWbase):
 		tempAddresses = self.__tempMGR.getTdevList()
 		for sensor in sensors["sensors"]:
 			if (sensor["address"] in tempAddresses):
-				self.__tempMGR.setDev(sensor["name"], sensor["address"])
+				uid = self.__tempMGR.setDev(sensor["address"], sensor["devType"])
 			else:
-				logging.warning("Addres not available: " + sensor["address"])
-			self.__sensors[sensor["name"]] = sensors["type"]
+				logging.warning("Temperature sensor at addres {} not available: ".format( sensor["address"]))
+				continue
+			self.__sensors[sensor["name"]] = {"type": sensors["type"],
+			                               "id": uid}
 			self.__otherSensors.append(sensor["name"])
 
 	def __setFlowSensors(self, sensors):
@@ -112,23 +116,23 @@ class HWinit(HWbase):
 				continue
 			# Setting soil moisture level sensor:
 			mst = data["mstSensor"]
-			# self.__setSoilSensor(mname, output[3], output[2], output[1])
-			gs.getPinDev(mst["ffPin1"]).setPin(gs.getPinNr(mst["ffPin1"]), False)
-			gs.getPinDev(mst["ffPin2"]).setPin(gs.getPinNr(mst["ffPin2"]), False)
-			self.__adc.setChannel(mst["name"], mst["ADCchannel"], mst["ffPin1"],
-			                      mst["ffPin2"], gs.getPinDev(mst["ffPin1"]))
-			self.__sensors[mst["name"]] = "mst"
+			uid = self.__adcMGR.setChannel(mst["channel"], mst["devNumber"])
+			if uid is False:
+				raise HwInitError
+			self.__sensors[mst["name"]] = {"type": "mst",
+			                               "id": uid}
 			mname = mst["name"]
 			tname = None
 			fname = None
 			# Setting soil temperature sensor:
 			tdev = data["tempSensor"]
-			if (gs.hwOptions["soiltemp"] and tdev["address"] is not None):
-				if (self.__tempMGR.setDev(tdev["name"], tdev["address"])):
-					self.__sensors[tdev["name"]] = "temp"
-					tname = tdev["name"]
-				else:
+			if gs.hwOptions["soiltemp"] and tdev["address"] is not None:
+				uid = self.__tempMGR.setDev(tdev["address"])
+				if uid is False:
 					logging.error("Temperature sensor {}, {} not found.".format(tdev["name"], tdev["address"]))
+				self.__sensors[tdev["name"]] = {"type": "temp",
+				                                "id": uid}
+				tname = tdev["name"]
 			# Setting water flow meter sensor:
 			fdev = data["flowMeter"]
 			if (gs.hwOptions["flowSensors"]):

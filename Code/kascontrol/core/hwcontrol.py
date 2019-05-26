@@ -133,7 +133,10 @@ class hwControl(wfi, rqd, pli, pci, hws, hwm, hwg, fsi, fni, dbc, ini):
 		return(self.__connectedCheckValue)
 
 	def shutdown(self):
-		"""Reset and turn off all in- and outputs when shutting down the system."""
+		"""
+		Reset and turn off all in- and outputs and ICs when
+		shutting down the system.
+		"""
 
 		if (gs.hwOptions["lcd"]):
 			self.LCD.disable()
@@ -151,6 +154,7 @@ class hwControl(wfi, rqd, pli, pci, hws, hwm, hwg, fsi, fni, dbc, ini):
 				ina.reset()
 		if (gs.hwOptions["status LED"]):
 			self.__statusLED.disable()
+		self.__spi.close()
 		self.__gpio.cleanup()
 
 	@abstractmethod

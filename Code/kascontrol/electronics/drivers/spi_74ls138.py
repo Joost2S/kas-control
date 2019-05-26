@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.02	19-05-2019
+# v0.01.03	26-05-2019
 
 
 import logging
@@ -25,10 +25,9 @@ class SPI_74LS138(object):
 		[1, 1, 1]
 	]
 
-	def __init__(self, pins, spi, gpio):
+	def __init__(self, pins, gpio):
 
 		self.gpio = gpio
-		self.spi = spi
 		for p in pins:
 			pinID = self.gpio.setPin(p["pin"], False, p["address"])
 			if pinID is False:
@@ -37,11 +36,7 @@ class SPI_74LS138(object):
 			self.pins.append(pinID)
 
 
-	def xfer(self, dev, args):
+	def set(self, devChannel):
 
-		for i, state in enumerate(self.lut[self.devices[dev]]):
+		for i, state in enumerate(self.lut[self.devices[devChannel]]):
 			self.gpio.output(self.pins[i], state)
-
-		data = self.spi.xfer2(args)
-
-		return(data)

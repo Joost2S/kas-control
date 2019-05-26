@@ -64,12 +64,12 @@
             "flip-flop": true,
             "pins": [
               {
-                "devNumber": "0",
-                "pin": "A0"
+                "pin": "A0",
+                "devNumber": 0
               },
               {
-                "devNumber": "0",
-                "pin": "A1"
+                "pin": "A1",
+                "devNumber": 0
               }
             ]
           },

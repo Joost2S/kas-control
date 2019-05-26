@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.8.28	17-05-2019
+# v0.8.29	26-05-2019
 
 
 import json
@@ -13,8 +13,6 @@ import threading
 import time
 
 from pymitter import EventEmitter
-
-from Code.kascontrol.electronics.drivers import spi_74ls138
 
 
 class globstuff:
@@ -77,15 +75,6 @@ class globstuff:
 
 		globstuff.threadnr +=1
 		return(globstuff.threadnr)
-
-	@staticmethod
-	def __getSPIselect():
-
-		data = globstuff.getSetupFile("hardware")
-		pins = data["74LS138"]["pins"]
-		return spi_74ls138.SPI_74LS138(pins=pins)
-
-	spi = __getSPIselect()
 
 	@staticmethod
 	def convertToPrec(data, places):

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.03	20-05-2019
+# v0.01.05	24-05-2019
 
 """
 Manages all ADC pins on supported devices.
@@ -16,7 +16,6 @@ appropriaate IC.
 
 
 import logging
-import threading
 import uuid
 
 from Code.kascontrol.electronics.drivers.mcp3x0x import MCP3004
@@ -43,7 +42,7 @@ class ADCmanager(object):
 	def __init__(self, gpio, spi, timeout):
 		super(ADCmanager, self).__init__()
 
-		self.__adclock = TimeoutLock(timeout)
+		self.__adclock = TimeoutLock(timeout).acquire_timeout
 		self.devices = dict()
 		self.gpio = gpio
 		self.spi = spi
@@ -65,6 +64,7 @@ class ADCmanager(object):
 					spi = self.spi.registerDevice(setup["spiChannel"])
 					if spi is False:
 						logging.critical("Failed to register spi channel for ADC {}.".format(setup["boardDesignation"]))
+						continue
 					dev = self.supportedDevices[adcType](
 						spi=spi,
 						dev=self.spi,
@@ -80,7 +80,6 @@ class ADCmanager(object):
 					continue
 				except ADCconfigError:
 					raise AbortInitError
-				# TODO: finish
 
 	def __setDevChannels(self, dev, channels, devDes):
 
@@ -105,22 +104,75 @@ class ADCmanager(object):
 					raise ADCconfigError
 				dev.setChannel(i, i, ff1, ff2)
 
-	def setChannel(self, channel, address=None, devNr=None, devDes=None):
+	def setChannel(self, channel, devAddr=None, devNr=None, devDes=None):
 
-		# TODO: implement!
-		pass
+		check, dev = self.getDevice(devAddr, devNr, devDes)
+		if check is False:
+			logging.warning("Tried to set a channel on unknown ADC device: {}".format(dev))
+			return False
+		if 0 > channel >= dev.chanAmount:
+			return False
+		pin = {"dev": dev,
+            "chan": channel}
+		if pin in self.pinList.values():
+			logging.warning("ADC {} channel {} already in use.".format(dev.spiChan, channel))
+			return False
 
-	def read(self, pin):
+		uid = uuid.uuid4()
+		self.pinList[uid] = pin
+		return uid
 
-		if pin not in self.pinList:
-			return
+	def read(self, pin, perc=None):
 
-	def readPin(self, pin, address=None, devNr=None, devDes=None):
-		pass
+		try:
+			channel = self.pinList[pin]
+			return channel["dev"].getMeasurement(channel["chan"], perc=perc)
+		except KeyError:
+			return None
 
-	def getResolution(self, pin=None, address=None, devNr=None, devDes=None):
-		pass
+	def readPin(self, pin, devAddr=None, devNr=None, devDes=None, perc=False):
+		check, dev = self.getDevice(devAddr, devNr, devDes)
+		if not check:
+			return None
+		try:
+			return dev.getMeasurement(pin, perc=perc)
+		except KeyError:
+			return None
+
+	def getResolution(self, pin=None, devAddr=None, devNr=None, devDes=None):
+
+		if pin is not None:
+			try:
+				return self.pinList[pin]["dev"].getResolution()
+			except KeyError:
+				return None
+		check, dev = self.getDevice(devAddr, devNr, devDes)
+		if not check:
+			return None
+		return dev.getResolution()
 
 	def setLockTimeout(self, t):
 
 		self.__adclock.timeout = 0.5 * t
+
+	def getDevice(self, devAddr=None, devNr=None, devDes=None):
+
+		if devAddr is not None:
+			try:
+				return self.devByAddr[devAddr]
+			except KeyError:
+				return False, devAddr
+
+		if devNr is not None:
+			try:
+				return self.devByNr[devNr]
+			except KeyError:
+				return False, devNr
+
+		if devDes is not None:
+			try:
+				return self.devByBoardDes[devDes]
+			except KeyError:
+				return False, devDes
+
+		return False, None

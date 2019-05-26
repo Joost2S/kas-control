@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.01	19-05-2019
+# v0.01.02	25-05-2019
 
 
 import logging
@@ -10,13 +10,12 @@ import uuid
 
 from Code.kascontrol.electronics.drivers.spi_74ls138 import SPI_74LS138
 from Code.kascontrol.globstuff import globstuff as gs
-from Code.kascontrol.utils.errors import SpiConfigError
 
 
 class SPImanager(object):
 
 	__devList = dict()
-	spi = None
+	ls138 = None
 	spiBus = None
 
 	def __init__(self, gpio):
@@ -27,27 +26,15 @@ class SPImanager(object):
 		self.spiBus.open(0, 0)
 		try:
 			data = gs.getSetupFile("hardware")["74LS138"]
-			self.gpio = gpio
-			self.__set74LS138(data)
+			self.ls138 = SPI_74LS138(data["pins"], gpio)
 		except KeyError:
-			self.__setSPI()
+			self.ls138 = None
 
-
-	def __setSPI(self):
-
-		self.spi = self.spiBus
-
-	def __set74LS138(self, data):
-
-		try:
-			self.spi = SPI_74LS138(data["pins"], self.spiBus, self.gpio)
-		except KeyError:
-			raise SpiConfigError
 
 	def registerDevice(self, devChannel):
 
 		uid = uuid.uuid4()
-		if isinstance(self.spi, SPI_74LS138):
+		if self.ls138 is not None:
 			if 0 < devChannel < 8:
 				if devChannel in self.__devList.values():
 					logging.error("SPI channel {} already in use.".format(devChannel))
@@ -62,14 +49,59 @@ class SPImanager(object):
 		logging.warning("Could not register SPI device. Invalid SPI channel: {}".format(devChannel))
 		return False
 
-	def xfer(self, dev, data):
+	def readbytes(self, devChannel, n):
 
-		if isinstance(self.spi, SPI_74LS138):
-			try:
-				return self.spi.xfer(self.__devList[dev], data)
-			except KeyError:
-				logging.debug("Wrong uid used to access SPI.")
-			return
-		if dev in self.__devList.keys():
-			return self.spi.xfer2(data)
-		logging.debug("Wrong uid used to access SPI.")
+		if self.__setSpiForTransaction(devChannel):
+			return self.spiBus.readbytes(n)
+		return None
+
+	def writebytes(self, devChannel, data):
+
+		if self.__setSpiForTransaction(devChannel):
+			return self.spiBus.writebytes(data)
+		return None
+
+	def writebytes2(self, devChannel, data):
+
+		if self.__setSpiForTransaction(devChannel):
+			return self.spiBus.writebytes2(data)
+		return None
+
+	def xfer(self, devChannel, data):
+
+		if self.__setSpiForTransaction(devChannel):
+			return self.spiBus.xfer(data)
+		return None
+
+	def xfer2(self, devChannel, data):
+
+		if self.__setSpiForTransaction(devChannel):
+			return self.spiBus.xfer2(data)
+		return None
+
+	def xfer3(self, devChannel, data):
+
+		if self.__setSpiForTransaction(devChannel):
+			return self.spiBus.xfer3(data)
+		return None
+
+	def __setSpiForTransaction(self, devChannel):
+
+		if devChannel not in self.__devList.keys():
+			logging.debug("UUID used to access SPI does not exist.")
+			return False
+		if self.ls138 is not None:
+			self.ls138.set(self.__devList[devChannel])
+		return True
+
+	def mode(self, value: int=None):
+
+		if value is None:
+			return self.spiBus.mode
+		elif 0 <= value < 4:
+			self.spiBus.mode = value
+		else:
+			logging.debug("Tried to set incorrect mode for the SPI bus: {}".format(value))
+
+	def close(self):
+		self.spiBus.close()

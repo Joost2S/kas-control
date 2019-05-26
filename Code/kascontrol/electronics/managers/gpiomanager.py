@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Author: J. Saarloos
-# v0.01.02	15-05-2019
+# v0.01.03	26-05-2019
 
 
 import logging
@@ -107,27 +107,27 @@ class GPIOManager(object):
 			return self.__setRPiPin(pin, state, args)
 		return False
 
-	def __setmcp230xxPin(self, device, pin, state):
+	def __setmcp230xxPin(self, device, pin, direction):
 
 		if not self.__checkPinToSet(device.devAddr, pin):
 			return False
-		uid = device.setPin(pin=pin, direction=state, exclusive=True)
+		uid = device.setPin(pin=pin, direction=direction, exclusive=True)
 		self.pinList[uid] = {"device": device,
 		                     "input": device.getPinState,
 		                     "output": device.output,
-		                     "address": device.devAddr,
+		                     "address": hex(device.devAddr),
 		                     "pin": pin,
-		                     "state": state}
+		                     "direction": direction}
 		return uid
 
-	def __setRPiPin(self, pin, state, args):
+	def __setRPiPin(self, pin, direction, args):
 
 		if not self.__checkPinToSet("rpi", pin):
 			return False
-		if state:
-			state = GPIO.IN
+		if direction:
+			direction = GPIO.IN
 		else:
-			state = GPIO.OUT
+			direction = GPIO.OUT
 		pud = None
 		try:
 			if args["pud"] == "down":
@@ -138,14 +138,14 @@ class GPIOManager(object):
 				pud = GPIO.PUD_UP
 		except KeyError:
 			pass
-		GPIO.setup(pin, state, pull_up_down=pud)
+		GPIO.setup(pin, direction, pull_up_down=pud)
 		uid = uuid.uuid4()
 		self.pinList[uid] = {"device": GPIO,
 		                     "input": GPIO.input,
 		                     "output": GPIO.output,
 		                     "address": "rpi",
 		                     "pin": pin,
-		                     "state": state}
+		                     "direction": direction}
 		return uid
 
 	def __checkPinToSet(self, address, pin):
@@ -247,6 +247,15 @@ class GPIOManager(object):
 	def getSetups(self):
 
 		return self.devSetups
+
+	def getAddress(self, pin):
+		"""Reverse look-up. Get pin address and number for pin ID."""
+
+		try:
+			return {"address": self.pinList[pin]["address"],
+			        "pin": self.pinList[pin]["pin"]}
+		except KeyError:
+			return None
 
 	def input(self, pin):
 
